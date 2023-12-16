@@ -1,0 +1,48 @@
+cmake_minimum_required(VERSION 3.10)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
+
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg/scripts/buildsystems/vcpkg.cmake"
+  CACHE STRING "Vcpkg toolchain file")
+set(VCPKG_INSTALLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg/installed/")
+
+project(computer_graphics)
+
+
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+find_package(OpenGL REQUIRED)
+include_directories( ${OPENGL_INCLUDE_DIR} )
+
+find_package(GLUT REQUIRED)
+
+find_package(Eigen3 REQUIRED)
+include_directories( ${Eigen3_INCLUDE_DIRS} )
+
+include_directories("oidn-2.1.0/include")
+file(GLOB_RECURSE OIDN_LIBS static files "oidn-2.1.0/lib/*.lib")
+
+
+include_directories("math")
+
+# add_subdirectory("math")
+
+add_subdirectory("hello_world")
+add_subdirectory("paint_line")
+add_subdirectory("read_image")
+add_subdirectory("paint_ellipse")
+add_subdirectory("parabola")
+add_subdirectory("transform2d")
+add_subdirectory("transform2dHW")
+add_subdirectory("Transformation_3D")
+add_subdirectory("hw4")
+add_subdirectory("WeilerAthertonLineClip")
+add_subdirectory("SeedFill")
+add_subdirectory("hw6")
+add_subdirectory("GroupWork7")
+add_subdirectory("hw7")
+add_subdirectory("CreatSphere")
+add_subdirectory("Spline")
+add_subdirectory("hw10")
+add_subdirectory("hw11")
