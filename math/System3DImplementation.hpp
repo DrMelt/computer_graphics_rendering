@@ -394,7 +394,10 @@ void System3D::_DrawSplines() {
 }
 
 void System3D::_DrawTrianglesInRangePixel(const Vector2i &xRange,
-                                          const Vector2i &yRange) {
+                                          const Vector2i &yRange,
+                                          int *const runninghreadCount) {
+  (*runninghreadCount)++;
+
   auto toView = System3D::ToView();
   const float window_x_i = 1.0f / window_x, window_y_i = 1.0f / window_y;
 
@@ -424,6 +427,8 @@ void System3D::_DrawTrianglesInRangePixel(const Vector2i &xRange,
     }
     current_x += nearplane_height_step;
   }
+
+  (*runninghreadCount)--;
 }
 
 void System3D::_DrawTrianglesInClip(const Primitive2D &clip) {

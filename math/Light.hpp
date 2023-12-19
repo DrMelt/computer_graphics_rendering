@@ -58,6 +58,7 @@ public:
       }
     }
   }
+
   virtual void RefreshShadowMapMultiThreads() {
     if (shadowMap == nullptr) {
       shadowMap = new Texture<float>(2048, 2048 * 6);

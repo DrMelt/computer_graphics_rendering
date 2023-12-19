@@ -447,7 +447,7 @@ public:
   SkyBox skyBox;
 
 protected:
-  int runningThreadsCount = 0;
+  // int runningThreadsCount = 0;
 
 public:
   static void SetPixelSampleTimes(const uint32_t times) {
@@ -499,7 +499,8 @@ public:
   }
   static void DrawTrianglesInRange(const Vector2f xPercent,
                                    const Vector2f yPercent) {
-    system->_DrawTrianglesInRange(xPercent, yPercent);
+    int temp = 0;
+    system->_DrawTrianglesInRange(xPercent, yPercent, &temp);
   }
 
   static void DrawTrianglesInRangeMultiThread(const Vector2f xPercent,
@@ -590,16 +591,16 @@ protected:
   void _DrawSplines();
 
   void _DrawTriangles() {
-    _DrawTrianglesInRangePixel(Vector2i(0, window_x), Vector2i(0, window_y));
+    int temp = 0;
+    _DrawTrianglesInRangePixel(Vector2i(0, window_x), Vector2i(0, window_y),
+                               &temp);
   }
   void _DrawTrianglesInClip(const Primitive2D &clip);
 
   void _DrawTrianglesInRangeMultiThread(const Vector2f &xPercent,
                                         const Vector2f &yPercent) {
     vector<thread *> threads;
-    int jionThreadCount = 0;
-
-    this->runningThreadsCount = 0;
+    int runninghreadCount = 0;
 
     const Vector2i xRange = (window_x * xPercent).cast<int>(),
                    yRange = (window_y * yPercent).cast<int>();
@@ -608,50 +609,48 @@ protected:
     // be careful release optimize!!
     int xCount = xRange.x();
     while (xCount < xRange.y()) {
-      if (this->runningThreadsCount < this->drawThreads) {
+      if (runninghreadCount < this->drawThreads) {
         int preX = xCount;
         xCount += clipX;
         if (xCount > xRange.y()) {
           xCount = xRange.y();
         }
         auto t = new thread(&System3D::_DrawTrianglesInRangePixel, this,
-                            Vector2i(preX, xCount), yRange);
+                            Vector2i(preX, xCount), yRange, &runninghreadCount);
         threads.push_back(t);
-
-        this->runningThreadsCount++;
       } else {
-        threads[jionThreadCount]->join();
-
-        jionThreadCount++;
-        this->runningThreadsCount--;
+        this_thread::sleep_for(std::chrono::milliseconds(1));
       }
     }
 
     // Waiting
-    for (int ind = jionThreadCount; ind < threads.size(); ind++) {
-      threads[ind]->join();
-    }
     for (auto tP : threads) {
+      tP->join();
       delete tP;
     }
   }
 
-  void _DrawTrianglesInRange(const Vector2f &xPercent,
-                             const Vector2f &yPercent) {
+  void _DrawTrianglesInRange(const Vector2f &xPercent, const Vector2f &yPercent,
+                             int *const runninghreadCount) {
     Vector2i xRange = (window_x * xPercent).cast<int>(),
              yRange = (window_y * yPercent).cast<int>();
-    _DrawTrianglesInRangePixel(xRange, yRange);
+    _DrawTrianglesInRangePixel(xRange, yRange, runninghreadCount);
   }
+
   void _DrawTrianglesInRangePixel(const Vector2i &xRange,
-                                  const Vector2i &yRange);
+                                  const Vector2i &yRange,
+                                  int *const runninghreadCount);
+
   void _DrawTrianglesInOnePixel(const Matrix4f &toView, const float current_x,
                                 const float current_y, const uint32_t x,
                                 const uint32_t y);
+
   void _SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
                                               const float current_x,
                                               const float current_y,
                                               const uint32_t x,
                                               const uint32_t y);
+
   void _SampleTrianglesInOnePixelRayTracing(const Matrix4f &toView,
                                             const float current_x,
                                             const float current_y,
