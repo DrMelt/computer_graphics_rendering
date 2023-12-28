@@ -409,13 +409,13 @@ public:
   Vector4f _ColorState() const { return colorState; }
   void _ColorStateSet(const Vector4f &rgba) { colorState = rgba; }
   void _SetWindowSize(const uint32_t x, const uint32_t y) {
-    _ClearBuffer();
-
     window_x = x;
     window_y = y;
     deltaPrePixelX = canvas_x / window_x;
     deltaPrePixelY = canvas_y / window_y;
     deltaPrePixel = deltaPrePixelX;
+
+    _ClearBuffer();
   }
 
 protected:
@@ -447,7 +447,30 @@ public:
   SkyBox skyBox;
 
 protected:
-  // int runningThreadsCount = 0;
+  MaterialManager materialManager;
+
+public:
+  static void PushMaterial(Material *const material) {
+    system->materialManager.PushMaterial(material);
+  }
+
+  static Material *const GetMaterial(const uint32_t ind) {
+    return system->materialManager.GetMaterial(ind);
+  }
+
+  static Material *const GetMaterialByName(const string &name) {
+    return system->materialManager.GetMaterialByName(name);
+  }
+
+  static Material *const GetDefaultMaterial() {
+    return system->materialManager.GetDefaultMaterial();
+  }
+
+protected:
+  vector<const Triangle *> trianglesRef;
+  vector<const Spline *> splinesRef;
+  vector<Light *> lightsRef;
+  BVHNode *bvhRoot = nullptr;
 
 public:
   static void SetPixelSampleTimes(const uint32_t times) {
@@ -537,12 +560,6 @@ public:
   }
 
 protected:
-  vector<const Triangle *> trianglesRef;
-  vector<const Spline *> splinesRef;
-  vector<Light *> lightsRef;
-  BVHNode *bvhRoot = nullptr;
-
-protected:
   void _RefreshShadowMap();
 
   void _BuildBVH();
@@ -570,7 +587,22 @@ protected:
   }
 
   void _ClearBuffer() {
-    delete[] zBuffer, colorBuffer, normalBuffer, albedoBuffer;
+    if (zBuffer != nullptr) {
+      delete[] zBuffer;
+      zBuffer = nullptr;
+    }
+    if (colorBuffer != nullptr) {
+      delete[] colorBuffer;
+      colorBuffer = nullptr;
+    }
+    if (normalBuffer != nullptr) {
+      delete[] normalBuffer;
+      normalBuffer = nullptr;
+    }
+    if (albedoBuffer != nullptr) {
+      delete[] albedoBuffer;
+      albedoBuffer = nullptr;
+    }
 
     colorBuffer = new Vector4f[window_x * window_y]{};
     normalBuffer = new Vector4f[window_x * window_y]{};

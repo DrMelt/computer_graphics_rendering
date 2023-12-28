@@ -14,9 +14,10 @@
 #include <stack>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 
-constexpr bool IS_RAY_TRACING = true;
+constexpr bool IS_RAY_TRACING = false;
 constexpr bool IS_PERSPECTIVE_PROJECT = true;
 
 #include "Transform.hpp"

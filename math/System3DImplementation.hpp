@@ -198,9 +198,16 @@ void System3D::_SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
   for (auto triaP : trias) {
     auto triaPos = triaP->RayIntersect(ray);
     if (ray.deep < System3D::ZBuffer(x, y)) {
-      auto pos = ray.deep * ray.dir + ray.origin;
-      auto normal = triaP->VaryingNormal(triaPos);
-      auto color = triaP->material.emitionColor;
+      const auto pos = ray.deep * ray.dir + ray.origin;
+      const auto normal = triaP->VaryingNormal(triaPos);
+      const auto uv = triaP->VaryingUV(triaPos);
+
+      auto color = triaP->material->SampleEmitionColor(normal, ray.dir, uv);
+
+      auto diffuseColor =
+          triaP->material->SampleDiffuseColor(normal, ray.dir, uv);
+      auto specularColor =
+          triaP->material->SampleDiffuseColor(normal, ray.dir, uv);
 
       for (auto light : lightsRef) {
         // if not in shadow
@@ -214,17 +221,16 @@ void System3D::_SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
             auto lightLuminance =
                 light->intensity / (lightRayLen * lightRayLen);
             // diffuse
-            color += cosNormalLight *
-                     triaP->material.diffuseColor.cwiseProduct(lightLuminance);
+            color += cosNormalLight * diffuseColor.cwiseProduct(lightLuminance);
             // specular
             color +=
                 pow(-(lightRayDir + ray.dir).normalized().dot(normal), 60) *
-                triaP->material.specularColor.cwiseProduct(lightLuminance);
+                specularColor.cwiseProduct(lightLuminance);
           }
         }
       }
 
-      color += triaP->material.diffuseColor.cwiseProduct(skyBox.emitionColor);
+      color += triaP->material->diffuseColor.cwiseProduct(skyBox.emitionColor);
 
       // Set pixel color
       System3D::SetBufferColor(x, y,
@@ -256,7 +262,7 @@ void System3D::_RaySample(Ray &ray) {
     const auto uv = closestTriaP->VaryingUV(closestTriaPos);
 
     ray.sampleInfo.uv = uv;
-    ray.sampleInfo.material = &(closestTriaP->material);
+    ray.sampleInfo.material = closestTriaP->material;
     ray.sampleInfo.inDir = ray.dir;
     ray.sampleInfo.normal = normal;
     ray.sampleInfo.pos = pos;
@@ -319,11 +325,10 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
             rayCopy.dir = newDir;
 
             diffuseRayInfo.color = diffuseRayInfo.material->SampleDiffuseColor(
-                diffuseRayInfo.normal, diffuseRayInfo.inDir, newDir,
-                diffuseRayInfo.uv);
+                diffuseRayInfo.normal, diffuseRayInfo.inDir, diffuseRayInfo.uv);
             diffuseRayInfo.emition =
                 diffuseRayInfo.material->SampleEmitionColor(
-                    diffuseRayInfo.normal, diffuseRayInfo.inDir, newDir,
+                    diffuseRayInfo.normal, diffuseRayInfo.inDir,
                     diffuseRayInfo.uv);
 
             infos.PushSamplePointInfo(diffuseRayInfo, rayCopy);
@@ -343,11 +348,11 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
 
             transmisionRayInfo.color =
                 transmisionRayInfo.material->SampleTransmissionColor(
-                    transmisionRayInfo.normal, transmisionRayInfo.inDir, newDir,
+                    transmisionRayInfo.normal, transmisionRayInfo.inDir,
                     transmisionRayInfo.uv);
             transmisionRayInfo.emition =
                 transmisionRayInfo.material->SampleEmitionColor(
-                    transmisionRayInfo.normal, transmisionRayInfo.inDir, newDir,
+                    transmisionRayInfo.normal, transmisionRayInfo.inDir,
                     transmisionRayInfo.uv);
 
             infos.PushSamplePointInfo(transmisionRayInfo, rayCopy);

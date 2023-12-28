@@ -24,7 +24,7 @@ int farplane_distance = 3000; // 视景体远平面与视点距离
 int window_x = 600;
 int window_y = 800;
 
-Vector3f eyePos = {0, 0.3f, 12};
+Vector3f eyePos = {0, 0.3f, 6};
 Vector3f eyeUp = {0, 1, 0};
 Vector3f lookAtPos = {0, 0.5, 0};
 
@@ -49,31 +49,24 @@ void Init() {
     system->activeCamera->nearplane_width *= 10;
   }
 
-  System3D::SetPixelSampleTimes(64);
+  System3D::SetPixelSampleTimes(8);
   System3D::SetPixelSampleDeep(5);
   System3D::SetThreads(8);
 
   light.axis.origin = Vector3f(5, 5, 5);
-  light.intensity = Vector3f(10, 10, 10);
+  light.intensity = Vector3f(100, 100, 100);
   System3D::PushLightRef(&light);
 
   // Read models
-  const string folderPath = "../../../../../models/hw11/";
+  const string folderPath = "../../../../../models/TextureText/";
   // const string folderPath = "models/hw11/";
-  model = ReadOBJ(folderPath + "test.obj");
+  model = ReadOBJ(folderPath + "texCube.obj");
   meshLight = ReadOBJ(folderPath + "light.obj");
 
-  Material *modelMaterial = new Material();
-  modelMaterial->diffuseColor = Vector3f(1.0f, 1.0f, 1.0f);
-
-  modelMaterial->transparency = 0.0f; // [0, 1]
-  modelMaterial->IOR = 1.5f;
-  model->AssignMaterial(modelMaterial);
-
-  Material *lightMaterial = new Material();
+  Material *lightMaterial = new Material;
   lightMaterial->diffuseColor = Vector3f::Zero();
   lightMaterial->specularColor = Vector3f::Zero();
-  lightMaterial->emitionColor = Vector3f(20, 20, 20);
+  lightMaterial->emitionColor = Vector3f(100, 100, 100);
   meshLight->AssignMaterial(lightMaterial);
 
   model->FlipX();
@@ -90,9 +83,9 @@ void Init() {
   System3D::BuildBVH();
 
   // Read hdr and set
-  Texture<Vector3f> *hdr = new Texture<Vector3f>(2048, 4096);
-  hdr->ReadImage(folderPath + "sky_linekotsi_03.png");
-  system->skyBox.texture = hdr;
+  Texture<Vector3f> hdr(2048, 4096);
+  hdr.ReadImage(folderPath + "sky_linekotsi_03.png");
+  system->skyBox.texture = new Texture(hdr);
 
   if constexpr (!IS_RAY_TRACING) {
     System3D::RefreshShadowMap();

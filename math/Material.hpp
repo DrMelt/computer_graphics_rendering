@@ -20,36 +20,108 @@ using namespace Eigen;
 
 struct Material {
 public:
+  string name;
+
   Vector3f diffuseColor = {0.8f, 0.8f, 0.8f};
   Vector3f specularColor = {0.8f, 0.8f, 0.8f};
   Vector3f emitionColor = Vector3f::Zero();
+  Vector3f transmissionColor = {1.0f, 1.0f, 1.0f};
+
+  Texture<Vector3f> *diffuseTexture = nullptr;
+  Texture<Vector3f> *specularTexture = nullptr;
+  Texture<Vector3f> *emitionTexture = nullptr;
+  Texture<Vector3f> *transmissionTexture = nullptr;
 
   float roughness = 1.0f;
 
   float transparency = 0.0f;
   float IOR = 1.5f;
-  Vector3f transmissionColor = {1.0f, 1.0f, 1.0f};
+
+public:
+  Material() = default;
+  virtual ~Material() {
+    if (diffuseTexture != nullptr) {
+      delete diffuseTexture;
+      diffuseTexture = nullptr;
+    }
+    if (specularTexture != nullptr) {
+      delete specularTexture;
+      specularTexture = nullptr;
+    }
+    if (emitionTexture != nullptr) {
+      delete emitionTexture;
+      emitionTexture = nullptr;
+    }
+    if (transmissionTexture != nullptr) {
+      delete transmissionTexture;
+      transmissionTexture = nullptr;
+    }
+  }
+
+  Material(const Material &mt)
+      : name(mt.name), roughness(mt.roughness), transparency(mt.transparency),
+        IOR(mt.IOR) {
+    if (mt.diffuseTexture != nullptr) {
+      diffuseTexture = new Texture<Vector3f>(*mt.diffuseTexture);
+    } else {
+      diffuseTexture = nullptr;
+    }
+    if (mt.specularTexture != nullptr) {
+      specularTexture = new Texture<Vector3f>(*mt.specularTexture);
+    } else {
+      specularTexture = nullptr;
+    }
+    if (mt.emitionTexture != nullptr) {
+      emitionTexture = new Texture<Vector3f>(*mt.emitionTexture);
+    } else {
+      emitionTexture = nullptr;
+    }
+    if (mt.transmissionTexture != nullptr) {
+      transmissionTexture = new Texture<Vector3f>(*mt.transmissionTexture);
+    } else {
+      transmissionTexture = nullptr;
+    }
+  }
 
 public:
   virtual Vector3f
   SampleEmitionColor(const Vector3f normal, const Vector3f inDir,
-                     const Vector3f outDir,
                      const Vector2f uv = Vector2f::Zero()) const {
-    return emitionColor;
+    if (emitionTexture != nullptr) {
+      return emitionTexture->Sample(uv.x(), uv.y());
+    } else {
+      return emitionColor;
+    }
+  }
+
+  virtual Vector3f
+  SampleSpecularColor(const Vector3f normal, const Vector3f inDir,
+                      const Vector2f uv = Vector2f::Zero()) const {
+    if (specularTexture != nullptr) {
+      return specularTexture->Sample(uv.x(), uv.y());
+    } else {
+      return specularColor;
+    }
   }
 
   virtual Vector3f
   SampleDiffuseColor(const Vector3f normal, const Vector3f inDir,
-                     const Vector3f outDir,
                      const Vector2f uv = Vector2f::Zero()) const {
-    return diffuseColor;
+    if (diffuseTexture != nullptr) {
+      return diffuseTexture->Sample(uv.x(), uv.y());
+    } else {
+      return diffuseColor;
+    }
   }
 
   virtual Vector3f
   SampleTransmissionColor(const Vector3f normal, const Vector3f inDir,
-                          const Vector3f outDir,
                           const Vector2f uv = Vector2f::Zero()) const {
-    return transmissionColor;
+    if (transmissionTexture != nullptr) {
+      return transmissionTexture->Sample(uv.x(), uv.y());
+    } else {
+      return transmissionColor;
+    }
   }
 
   // Will change 'weight'
@@ -106,14 +178,60 @@ public:
 };
 
 struct SkyBox : public Material {
+public:
+  Texture<Vector3f> *texture = nullptr;
 
-  Texture<Vector3f> texture;
+public:
+  virtual ~SkyBox() {
+    if (texture != nullptr) {
+      delete texture;
+      texture = nullptr;
+    }
+  }
 
+public:
   Vector3f SampleSkyBoxColor(const Vector3f &inDir) const {
-    auto texturePos = MapDir2TextureInCylinder(inDir);
-    auto color = texture.Sample(texturePos.x(), texturePos.y());
+    if (texture != nullptr) {
+      auto texturePos = MapDir2TextureInCylinder(inDir);
+      auto color = texture->Sample(texturePos.x(), texturePos.y());
 
-    return color;
+      return color;
+    } else {
+      return emitionColor;
+    }
+  }
+};
+
+class MaterialManager {
+protected:
+  vector<Material *> materials;
+
+public:
+  MaterialManager() {
+    auto defaultMaterial = new Material;
+    defaultMaterial->name = "defualt";
+    materials.push_back(defaultMaterial);
+  }
+
+  virtual ~MaterialManager() {
+    for (auto &mP : materials) {
+      delete mP;
+    }
+  }
+
+  void PushMaterial(Material *const materialP) {
+    materials.push_back(materialP);
+  }
+
+  Material *const GetDefaultMaterial() { return materials[0]; }
+
+  Material *const GetMaterial(const uint32_t ind) { return materials[ind]; }
+
+  Material *const GetMaterialByName(const string &name) {
+    auto itor =
+        find_if(materials.begin(), materials.end(),
+                [name](Material *mt) -> bool { return mt->name == name; });
+    return *itor;
   }
 };
 

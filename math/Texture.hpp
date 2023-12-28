@@ -94,8 +94,7 @@ protected:
   T *data = nullptr;
 
 public:
-  Texture(const uint32_t x = 1024, const uint32_t y = 1024)
-      : size(x, y), dataLen(x * y) {
+  Texture(const uint32_t x, const uint32_t y) : size(x, y), dataLen(x * y) {
     data = new T[dataLen];
   }
 
@@ -105,14 +104,16 @@ public:
     }
     data = new T[dataLen];
 
-    for (uint32_t i = 0; i < dataLen; ++i) {
-      data[i] = other.data[i];
-    }
-
-    // memcpy(data, other.data, dataLen * sizeof(T));
+    // for (uint32_t i = 0; i < dataLen; ++i) {
+    //   data[i] = other.data[i];
+    // }
+    memcpy(data, other.data, dataLen * sizeof(T));
   }
 
   Texture &operator=(const Texture<T> &other) {
+    delete[] data;
+    data = nullptr;
+
     size = other.size;
     dataLen = other.dataLen;
 
@@ -137,6 +138,16 @@ public:
   }
 
 public:
+  void ReSize(const uint32_t x, const uint32_t y) {
+    size = Vector2i(x, y);
+    dataLen = x * y;
+
+    if (data != nullptr) {
+      delete[] data;
+    }
+    data = new T[dataLen];
+  }
+
   Vector2i Size() const { return size; }
 
   void Fill(const T &dataFrom) {
@@ -154,8 +165,10 @@ public:
   }
 
   T Sample(const float x, const float y) const {
-    return GetData(static_cast<uint32_t>(x * size.x()),
-                   static_cast<uint32_t>(y * size.y()));
+    const auto mod_x = fmodf(x, 1.0f), mod_y = fmodf(y, 1.0f);
+
+    return GetData(static_cast<uint32_t>(mod_x * size.x()),
+                   static_cast<uint32_t>(mod_y * size.y()));
   }
 
   uint32_t GetIndFromXY(const uint32_t x, const uint32_t y) const {
@@ -163,6 +176,7 @@ public:
   }
 
   void ReadImage(const string &filePath);
+  void ReadImageAndMatchSize(const string &filePath);
 };
 
 void Texture<Vector3f>::ReadImage(const string &filePath) {
@@ -174,7 +188,36 @@ void Texture<Vector3f>::ReadImage(const string &filePath) {
   const int width = I.cols;
   const int channels = I.channels();
 
-  // cout << height << "  " << width << endl;
+  float xScale = static_cast<float>(height) / size.x();
+  float yScale = static_cast<float>(width) / size.y();
+
+  auto imageIndStart = [height, width, xScale, yScale, channels](
+                           const uint32_t x, const uint32_t y) -> uint32_t {
+    return ((height - 1 - floor(xScale * x)) * width + floor(yScale * y)) *
+           channels;
+  };
+
+  for (int x = 0; x < size.x(); ++x) {
+    for (int y = 0; y < size.y(); ++y) {
+      auto indStart = imageIndStart(x, y);
+      data[GetIndFromXY(x, y)] =
+          Vector3f(imageData[indStart + 2], imageData[indStart + 1],
+                   imageData[indStart]) *
+          pixelValueScale;
+    }
+  }
+}
+
+void Texture<Vector3f>::ReadImageAndMatchSize(const string &filePath) {
+  const float pixelValueScale = 1.0f / 255.0f;
+  cv::Mat I = cv::imread(filePath);
+  auto imageData = I.data;
+  // image size
+  const int height = I.rows;
+  const int width = I.cols;
+  const int channels = I.channels();
+
+  ReSize(height, width);
 
   float xScale = static_cast<float>(height) / size.x();
   float yScale = static_cast<float>(width) / size.y();

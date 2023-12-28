@@ -18,6 +18,25 @@
 using namespace std;
 using namespace Eigen;
 
+string GetFolderPath(const string &filePath) {
+  filesystem::path folder = filesystem::path(filePath).parent_path();
+
+  return folder.string();
+}
+
+bool IsAbsolutePath(const string &path) {
+  if (path.empty()) {
+    return false;
+  }
+  if (path[0] == '/') {
+    return true;
+  }
+  if (path.size() > 1 && path[1] == ':') {
+    return true;
+  }
+  return false;
+}
+
 /*
  * split string and return it's parts
  */
@@ -65,9 +84,8 @@ vector<string> ReadFileWithLines(const string &filePath) {
  */
 string SplitFirstWordInLine(string &line) {
   auto itor = line.begin();
+  string::iterator lastStart = line.end();
   string prefixWord;
-
-  string::iterator lastStart;
 
   for (; itor != line.end(); ++itor) {
     if (*itor != ' ') {
@@ -101,45 +119,118 @@ string SplitFirstWordInLine(string &line) {
 }
 
 /*
+ *  Be called by ReadOBJ Function
+ */
+void ReadMTLFile(const string &fileName, const string &objFilePath) {
+  auto folderPath = GetFolderPath(objFilePath);
+  auto mtlPath = folderPath + "/" + fileName;
+
+  auto lines = ReadFileWithLines(mtlPath);
+
+  Material *material = nullptr;
+  for (auto line : lines) {
+    auto prefix = SplitFirstWordInLine(line);
+
+    if (prefix == string("newmtl")) {
+      auto mtName = line;
+
+      if (material != nullptr) {
+        System3D::PushMaterial(material);
+      }
+      material = new Material;
+      material->name = mtName;
+    }
+    // diffuse
+    else if (prefix == string("Kd")) {
+      if (material != nullptr) {
+        auto words = SlpitString(line);
+        material->diffuseColor = {stof(words[0]), stof(words[1]),
+                                  stof(words[2])};
+      }
+    }
+    // specular
+    else if (prefix == string("Ks")) {
+      if (material != nullptr) {
+        auto words = SlpitString(line);
+        material->specularColor = {stof(words[0]), stof(words[1]),
+                                   stof(words[2])};
+      }
+    }
+    // emition
+    else if (prefix == string("Ke")) {
+      if (material != nullptr) {
+        auto words = SlpitString(line);
+        material->emitionColor = {stof(words[0]), stof(words[1]),
+                                  stof(words[2])};
+      }
+    }
+    // diffuse texture
+    else if (prefix == string("map_Kd")) {
+      if (material != nullptr) {
+        string imgPath;
+
+        if (IsAbsolutePath(line)) {
+          imgPath = line;
+        } else {
+          imgPath = folderPath + "/" + line;
+        }
+
+        material->diffuseTexture = new Texture<Vector3f>(0, 0);
+        material->diffuseTexture->ReadImageAndMatchSize(imgPath);
+      }
+    }
+  }
+  if (material != nullptr) {
+    System3D::PushMaterial(material);
+    material = nullptr;
+  }
+}
+
+/*
  *Read obj model file
  *Only support Triangle faces
  */
 Geometry *ReadOBJ(const string &filePath) {
   auto lines = ReadFileWithLines(filePath);
-  vector<string> processedLines;
-  // Uncomment and delete empty lines
-  for (auto &line : lines) {
-    if (line.size() > 0) {
-      for (auto ch : line) {
-        if (ch != ' ') {
-          if (ch != '#') {
-            processedLines.push_back(line);
+  /*  vector<string> processedLines;
+    // Uncomment and delete empty lines
+    for (auto &line : lines) {
+      if (line.size() > 0) {
+        for (auto ch : line) {
+          if (ch != ' ') {
+            if (ch != '#') {
+              processedLines.push_back(line);
+            }
+            break;
           }
-          break;
         }
       }
-    }
-  }
+    }*/
 
   auto geo = new Geometry;
   vector<Vector3f> normals;
   vector<Vector2f> uvs;
 
-  // Build new geo
-  for (auto &line : lines) {
-    auto prefix = SplitFirstWordInLine(line);
-    // cout << prefix << endl;
-    // cout << line << endl;
+  Material *materialPtrTemp = System3D::GetDefaultMaterial();
 
+  // Build new geo
+  for (auto line : lines) {
+    auto prefix = SplitFirstWordInLine(line);
+
+    // vertex position
     if (prefix == string("v")) {
       auto words = SlpitString(line);
       Vector3f pos = {stof(words[0]), stof(words[1]), stof(words[2])};
       geo->AddPoint(pos);
-    } else if (prefix == string("vn")) {
+    }
+    // vertex normal
+    else if (prefix == string("vn")) {
       auto words = SlpitString(line);
       Vector3f normal = {stof(words[0]), stof(words[1]), stof(words[2])};
       normals.push_back(normal);
-    } else if (prefix == string("vt")) {
+    }
+    // vertex uv
+    else if (prefix == string("vt")) {
       auto words = SlpitString(line);
       Vector2f uv = {stof(words[0]), stof(words[1])};
       uvs.push_back(uv);
@@ -171,7 +262,17 @@ Geometry *ReadOBJ(const string &filePath) {
       newTria->GetVertex(2)->attributes.uv = uvs[uvInds[2]];
       newTria->GetVertex(2)->attributes.normal = normals[normalInds[2]];
 
+      // Assign material
+      newTria->material = materialPtrTemp;
+
       geo->AddPrimitive(newTria);
+
+    } else if (prefix == string("mtllib")) {
+      auto file = line;
+      ReadMTLFile(file, filePath);
+    } else if (prefix == string("usemtl")) {
+      auto materialName = line;
+      materialPtrTemp = System3D::GetMaterialByName(materialName);
     }
   }
 

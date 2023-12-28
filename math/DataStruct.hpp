@@ -977,7 +977,7 @@ protected:
 
 struct Mesh : public Primitive {
 public:
-  Material material;
+  const Material *material = nullptr;
 
 public:
   Mesh() = default;
@@ -1401,7 +1401,7 @@ public:
     }
   }
 
-  void AssignMaterial(const Material &material) {
+  void AssignMaterial(Material *const material) {
     for (auto &primP : primitives) {
       auto meshP = dynamic_cast<Mesh *>(primP);
       if (meshP != nullptr) {
