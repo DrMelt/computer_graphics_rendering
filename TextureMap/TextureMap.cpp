@@ -26,12 +26,12 @@ int window_y = 800;
 
 Vector3f eyePos = {0, 0.3f, 6};
 Vector3f eyeUp = {0, 1, 0};
-Vector3f lookAtPos = {0, 0.5, 0};
+Vector3f lookAtPos = {0, 0.3f, 0};
 
 const float rotateSpeed = 0.5f;
 
 Geometry *model = nullptr, *meshLight = nullptr;
-Light light;
+Light light1, light2, light3;
 // Texture<Vector3f> hdr(2048, 4096);
 
 void Init() {
@@ -53,14 +53,21 @@ void Init() {
   System3D::SetPixelSampleDeep(5);
   System3D::SetThreads(8);
 
-  light.axis.origin = Vector3f(5, 5, 5);
-  light.intensity = Vector3f(100, 100, 100);
-  System3D::PushLightRef(&light);
+  light1.axis.origin = Vector3f(5, 5, 5);
+  light1.intensity = Vector3f(100, 100, 100);
+  light2.axis.origin = Vector3f(5, 0, -5);
+  light2.intensity = Vector3f(20, 20, 20);
+  light3.axis.origin = Vector3f(-5, 0, 5);
+  light3.intensity = Vector3f(20, 20, 20);
+  System3D::PushLightRef(&light1);
+  System3D::PushLightRef(&light2);
+  System3D::PushLightRef(&light3);
 
   // Read models
-  const string folderPath = "../../../../../models/TextureText/";
+  const string folderPath = "../../../../../models/";
   // const string folderPath = "models/hw11/";
-  model = ReadOBJ(folderPath + "texCube.obj");
+  // model = ReadOBJ(folderPath + "11-04-16/11-04-16.obj");
+  model = ReadOBJ(folderPath + "TextureText/texCube.obj");
   meshLight = ReadOBJ(folderPath + "light.obj");
 
   Material *lightMaterial = new Material;
@@ -84,8 +91,9 @@ void Init() {
 
   // Read hdr and set
   Texture<Vector3f> hdr(2048, 4096);
-  hdr.ReadImage(folderPath + "sky_linekotsi_03.png");
+  hdr.ReadImage(folderPath + "/TextureText/sky_linekotsi_03.png");
   system->skyBox.texture = new Texture(hdr);
+  system->skyBox.emitionColor = Vector3f(0.1f, 0.1f, 0.1f);
 
   if constexpr (!IS_RAY_TRACING) {
     System3D::RefreshShadowMap();
@@ -119,45 +127,108 @@ void display(void) {
 }
 
 const float cameraStep = 0.1f;
+const float cameraRotationStep = 0.1f;
 // ¼üÅÌ½»»¥ÊÂ¼þ
 void keyboard(unsigned char key, int x, int y) {
   switch (key) {
 
   case 'a':
   case 'A': {
-    System3D::GetSystem()->activeCamera->eyePos.x() += cameraStep;
+    Vector3f stepVec = {-cameraStep, 0, 0};
+    auto viewM = System3D::GetV().inverse();
+    stepVec = TransformForVector(stepVec, viewM);
+
+    System3D::GetSystem()->activeCamera->eyePos += stepVec;
+    System3D::GetSystem()->activeCamera->lookAtPos += stepVec;
     glutPostRedisplay();
     break;
   }
   case 'd':
   case 'D': {
-    System3D::GetSystem()->activeCamera->eyePos.x() -= cameraStep;
+    Vector3f stepVec = {cameraStep, 0, 0};
+    auto viewM = System3D::GetV().inverse();
+    stepVec = TransformForVector(stepVec, viewM);
+
+    System3D::GetSystem()->activeCamera->eyePos += stepVec;
+    System3D::GetSystem()->activeCamera->lookAtPos += stepVec;
     glutPostRedisplay();
     break;
   }
   case 'w':
   case 'W': {
-    System3D::GetSystem()->activeCamera->eyePos.z() -= cameraStep;
+    Vector3f stepVec = {0, 0, cameraStep};
+    auto viewM = System3D::GetV().inverse();
+    stepVec = TransformForVector(stepVec, viewM);
+
+    System3D::GetSystem()->activeCamera->eyePos += stepVec;
+    System3D::GetSystem()->activeCamera->lookAtPos += stepVec;
     glutPostRedisplay();
     break;
   }
   case 's':
   case 'S': {
-    System3D::GetSystem()->activeCamera->eyePos.z() += cameraStep;
+    Vector3f stepVec = {0, 0, -cameraStep};
+    auto viewM = System3D::GetV().inverse();
+    stepVec = TransformForVector(stepVec, viewM);
+
+    System3D::GetSystem()->activeCamera->eyePos += stepVec;
+    System3D::GetSystem()->activeCamera->lookAtPos += stepVec;
     glutPostRedisplay();
     break;
   }
+    // down
   case 'c':
   case 'C': {
-    System3D::GetSystem()->activeCamera->eyePos.y() -= cameraStep;
+    Vector3f stepVec = {0, -cameraStep, 0};
+    auto viewM = System3D::GetV().inverse();
+    stepVec = TransformForVector(stepVec, viewM);
+
+    System3D::GetSystem()->activeCamera->eyePos += stepVec;
+    System3D::GetSystem()->activeCamera->lookAtPos += stepVec;
     glutPostRedisplay();
     break;
   }
+    // up
   case 32: {
-    System3D::GetSystem()->activeCamera->eyePos.y() += cameraStep;
+    Vector3f stepVec = {0, cameraStep, 0};
+    auto viewM = System3D::GetV().inverse();
+    stepVec = TransformForVector(stepVec, viewM);
+
+    System3D::GetSystem()->activeCamera->eyePos += stepVec;
+    System3D::GetSystem()->activeCamera->lookAtPos += stepVec;
     glutPostRedisplay();
     break;
   }
+    // rotation
+  case 'q':
+  case 'Q': {
+    auto rotateM = Rotate3dH(System3D::GetSystem()->activeCamera->eyeUp,
+                             cameraRotationStep);
+
+    Vector3f dir = System3D::GetSystem()->activeCamera->lookAtPos -
+                   System3D::GetSystem()->activeCamera->eyePos;
+    dir = TransformForVector(dir, rotateM);
+
+    System3D::GetSystem()->activeCamera->lookAtPos =
+        System3D::GetSystem()->activeCamera->eyePos + dir;
+    glutPostRedisplay();
+    break;
+  }
+    // rotation
+  case 'e':
+  case 'E': {
+    auto rotateM = Rotate3dH(System3D::GetSystem()->activeCamera->eyeUp,
+                             -cameraRotationStep);
+    Vector3f dir = System3D::GetSystem()->activeCamera->lookAtPos -
+                   System3D::GetSystem()->activeCamera->eyePos;
+    dir = TransformForVector(dir, rotateM);
+
+    System3D::GetSystem()->activeCamera->lookAtPos =
+        System3D::GetSystem()->activeCamera->eyePos + dir;
+    glutPostRedisplay();
+    break;
+  }
+
   case 27: {
     exit(0);
     break;

@@ -8,12 +8,10 @@
 
 using namespace Eigen;
 
-float random_0_to_1() {
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<float> dis(0.0, 1.0);
-  return dis(gen);
-}
+std::random_device random_device_instance;
+std::mt19937 gen(random_device_instance());
+std::uniform_real_distribution<float> dis(0.0, 1.0);
+float random_0_to_1() { return dis(gen); }
 
 Vector3f TransformForPos(const Vector3f &originPos, const Matrix4f &transM) {
   Vector4f ex_pos(originPos.x(), originPos.y(), originPos.z(), 1.0f);
@@ -51,21 +49,17 @@ Matrix3f Rotate2dH(const float radian) {
   return rotate2dH;
 }
 
-Matrix3f Rotate3d(const Vector3f axis, const float radian) {
+Matrix3f Rotate3d(const Vector3f &axis, const float radian) {
   auto axis_normal = axis.normalized();
-  AngleAxisd rotation_vector(radian,
-                             axis_normal.cast<double>()); // 创建旋转对象
-  Matrix3f rotation_matrix = rotation_vector.toRotationMatrix()
-                                 .cast<float>(); // 将旋转对象转换为旋转矩阵
-
+  AngleAxisd rotation_vector(-radian, axis_normal.cast<double>());
+  Matrix3f rotation_matrix = rotation_vector.toRotationMatrix().cast<float>();
   return rotation_matrix;
 }
 
-Matrix4f Rotate3dH(const Vector3f axis, const float radian) {
-  Matrix3f rotation_matrix = Rotate3d(axis, radian); // 将旋转对象转换为旋转矩阵
+Matrix4f Rotate3dH(const Vector3f &axis, const float radian) {
+  Matrix3f rotation_matrix = Rotate3d(axis, radian);
   Matrix4f rotation_matrixH;
 
-  // 将旋转矩阵转换为齐次变换矩阵
   rotation_matrixH.block<3, 3>(0, 0) = rotation_matrix;
   rotation_matrixH.block<1, 3>(3, 0) << 0, 0, 0;
   rotation_matrixH.block<3, 1>(0, 3) << 0, 0, 0;
@@ -74,18 +68,18 @@ Matrix4f Rotate3dH(const Vector3f axis, const float radian) {
   return rotation_matrixH;
 }
 
-Matrix4f Translate3dH(const Vector3f translation) {
-  Matrix4f translate_matrix = Matrix4f::Identity(); // 将旋转对象转换为旋转矩阵
+Matrix4f Translate3dH(const Vector3f &translation) {
+  Matrix4f translate_matrix = Matrix4f::Identity();
   translate_matrix.block<3, 1>(0, 3) = translation;
   return translate_matrix;
 }
 
 #include <iostream>
 
-// View transfer
+// View transfer  ( same as Camera look dir -> [0,0,1] )
 // Translate and rotate
-Matrix4f LookAtMatrix(const Vector3f eyePos, const Vector3f lookAtCenterPos,
-                      const Vector3f upVec) {
+Matrix4f LookAtMatrix(const Vector3f &eyePos, const Vector3f &lookAtCenterPos,
+                      const Vector3f &upVec) {
   Vector3f pos = eyePos, lookAt = lookAtCenterPos, up = upVec;
 
   lookAt = (lookAt - pos).normalized();
