@@ -24,9 +24,9 @@ int farplane_distance = 3000; // 视景体远平面与视点距离
 int window_x = 600;
 int window_y = 800;
 
-Vector3f eyePos = {0, 0.3f, 6};
+Vector3f eyePos = {0, 1.0f, 0};
+Vector3f lookAtPos = {0, 1.0f, -10};
 Vector3f eyeUp = {0, 1, 0};
-Vector3f lookAtPos = {0, 0.3f, 0};
 
 const float rotateSpeed = 0.5f;
 
@@ -53,21 +53,21 @@ void Init() {
   System3D::SetPixelSampleDeep(5);
   System3D::SetThreads(8);
 
-  light1.axis.origin = Vector3f(5, 5, 5);
+  light1.axis.origin = Vector3f(0, 3, 6);
   light1.intensity = Vector3f(100, 100, 100);
   light2.axis.origin = Vector3f(5, 0, -5);
   light2.intensity = Vector3f(20, 20, 20);
   light3.axis.origin = Vector3f(-5, 0, 5);
   light3.intensity = Vector3f(20, 20, 20);
   System3D::PushLightRef(&light1);
-  System3D::PushLightRef(&light2);
-  System3D::PushLightRef(&light3);
+  // System3D::PushLightRef(&light2);
+  // System3D::PushLightRef(&light3);
 
   // Read models
   const string folderPath = "../../../../../models/";
   // const string folderPath = "models/hw11/";
   // model = ReadOBJ(folderPath + "11-04-16/11-04-16.obj");
-  model = ReadOBJ(folderPath + "TextureText/texCube.obj");
+  model = ReadOBJ(folderPath + "bighw/stage.obj");
   meshLight = ReadOBJ(folderPath + "light.obj");
 
   Material *lightMaterial = new Material;
@@ -93,7 +93,7 @@ void Init() {
   Texture<Vector3f> hdr(2048, 4096);
   hdr.ReadImage(folderPath + "/TextureText/sky_linekotsi_03.png");
   system->skyBox.texture = new Texture(hdr);
-  system->skyBox.emitionColor = Vector3f(0.1f, 0.1f, 0.1f);
+  system->skyBox.emitionColor = Vector3f(0.5f, 0.5f, 0.5f);
 
   if constexpr (!IS_RAY_TRACING) {
     System3D::RefreshShadowMap();

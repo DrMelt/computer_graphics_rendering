@@ -26,11 +26,13 @@ public:
   Vector3f specularColor = {0.8f, 0.8f, 0.8f};
   Vector3f emitionColor = Vector3f::Zero();
   Vector3f transmissionColor = {1.0f, 1.0f, 1.0f};
+  float alpha = 1.0f;
 
   Texture<Vector3f> *diffuseTexture = nullptr;
   Texture<Vector3f> *specularTexture = nullptr;
   Texture<Vector3f> *emitionTexture = nullptr;
   Texture<Vector3f> *transmissionTexture = nullptr;
+  Texture<float> *alphaTexture = nullptr;
 
   float roughness = 1.0f;
 
@@ -121,6 +123,15 @@ public:
       return transmissionTexture->Sample(uv.x(), uv.y());
     } else {
       return transmissionColor;
+    }
+  }
+
+  virtual float SampleAlpha(const Vector3f normal, const Vector3f inDir,
+                            const Vector2f uv = Vector2f::Zero()) const {
+    if (alphaTexture != nullptr) {
+      return alphaTexture->Sample(uv.x(), uv.y());
+    } else {
+      return alpha;
     }
   }
 

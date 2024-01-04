@@ -179,6 +179,36 @@ void ReadMTLFile(const string &fileName, const string &objFilePath) {
         material->diffuseTexture->ReadImageAndMatchSize(imgPath);
       }
     }
+    // emition texture
+    else if (prefix == string("map_Ke")) {
+      if (material != nullptr) {
+        string imgPath;
+
+        if (IsAbsolutePath(line)) {
+          imgPath = line;
+        } else {
+          imgPath = folderPath + "/" + line;
+        }
+
+        material->emitionTexture = new Texture<Vector3f>(0, 0);
+        material->emitionTexture->ReadImageAndMatchSize(imgPath);
+      }
+    }
+    // alpha texture
+    else if (prefix == string("map_d")) {
+      if (material != nullptr) {
+        string imgPath;
+
+        if (IsAbsolutePath(line)) {
+          imgPath = line;
+        } else {
+          imgPath = folderPath + "/" + line;
+        }
+
+        material->alphaTexture = new Texture<float>(0, 0);
+        material->alphaTexture->ReadAlpahFromImageAndMatchSize(imgPath);
+      }
+    }
   }
   if (material != nullptr) {
     System3D::PushMaterial(material);

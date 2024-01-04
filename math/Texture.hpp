@@ -145,7 +145,7 @@ public:
     if (data != nullptr) {
       delete[] data;
     }
-    data = new T[dataLen];
+    data = new T[dataLen]{};
   }
 
   Vector2i Size() const { return size; }
@@ -165,7 +165,13 @@ public:
   }
 
   T Sample(const float x, const float y) const {
-    const auto mod_x = fmodf(x, 1.0f), mod_y = fmodf(y, 1.0f);
+    auto mod_x = fmodf(x, 1.0f - 1e-8f), mod_y = fmodf(y, 1.0f - 1e-8f);
+    if (mod_x < 0) {
+      mod_x += 1.0f;
+    }
+    if (mod_y < 0) {
+      mod_y += 1.0f;
+    }
 
     return GetData(static_cast<uint32_t>(mod_x * size.x()),
                    static_cast<uint32_t>(mod_y * size.y()));
@@ -177,6 +183,7 @@ public:
 
   void ReadImage(const string &filePath);
   void ReadImageAndMatchSize(const string &filePath);
+  void ReadAlpahFromImageAndMatchSize(const string &filePath);
 };
 
 void Texture<Vector3f>::ReadImage(const string &filePath) {
@@ -236,6 +243,67 @@ void Texture<Vector3f>::ReadImageAndMatchSize(const string &filePath) {
                    imageData[indStart]) *
           pixelValueScale;
     }
+  }
+}
+
+void Texture<float>::ReadImageAndMatchSize(const string &filePath) {
+  const float pixelValueScale = 1.0f / 255.0f;
+  cv::Mat I = cv::imread(filePath);
+  auto imageData = I.data;
+  // image size
+  const int height = I.rows;
+  const int width = I.cols;
+  const int channels = I.channels();
+
+  ReSize(height, width);
+
+  float xScale = static_cast<float>(height) / size.x();
+  float yScale = static_cast<float>(width) / size.y();
+
+  auto imageIndStart = [height, width, xScale, yScale, channels](
+                           const uint32_t x, const uint32_t y) -> uint32_t {
+    return ((height - 1 - floor(xScale * x)) * width + floor(yScale * y)) *
+           channels;
+  };
+
+  for (int x = 0; x < size.x(); ++x) {
+    for (int y = 0; y < size.y(); ++y) {
+      auto indStart = imageIndStart(x, y);
+      data[GetIndFromXY(x, y)] = imageData[indStart];
+    }
+  }
+}
+
+void Texture<float>::ReadAlpahFromImageAndMatchSize(const string &filePath) {
+  const float pixelValueScale = 1.0f / 255.0f;
+  cv::Mat I = cv::imread(filePath, cv::IMREAD_UNCHANGED);
+  auto imageData = I.data;
+  // image size
+  const int height = I.rows;
+  const int width = I.cols;
+  const int channels = I.channels();
+
+  ReSize(height, width);
+
+  float xScale = static_cast<float>(height) / size.x();
+  float yScale = static_cast<float>(width) / size.y();
+
+  // if image has alpha channel
+  if (channels > 3) {
+    auto imageIndStart = [height, width, xScale, yScale, channels](
+                             const uint32_t x, const uint32_t y) -> uint32_t {
+      return ((height - 1 - floor(xScale * x)) * width + floor(yScale * y)) *
+             channels;
+    };
+
+    for (int x = 0; x < size.x(); ++x) {
+      for (int y = 0; y < size.y(); ++y) {
+        auto indStart = imageIndStart(x, y);
+        data[GetIndFromXY(x, y)] = imageData[indStart + 3];
+      }
+    }
+  } else {
+    Fill(1.0f);
   }
 }
 

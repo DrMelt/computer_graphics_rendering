@@ -194,7 +194,50 @@ void System3D::_SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
   System3D::SetBufferColor(
       x, y, Vector4f(skyBoxColor.x(), skyBoxColor.y(), skyBoxColor.z(), 1.0f));
 
+#pragma region struct TransTriaInfo
+  struct TransTriaInfo {
+    TransTriaInfo(const TransTriaInfo &other)
+        : triaP(other.triaP), alpha(other.alpha), deep(other.deep),
+          rayDir(other.rayDir), hitPos(other.hitPos), uv(other.uv),
+          normal(other.normal){};
+
+    TransTriaInfo() = default;
+
+    TransTriaInfo(const Triangle *const triaP, const float alpha,
+                  const float deep, const Vector3f rayDir,
+                  const Vector3f hitPos, const Vector2f uv,
+                  const Vector3f normal)
+        : triaP(triaP), alpha(alpha), deep(deep), rayDir(rayDir),
+          hitPos(hitPos), uv(uv), normal(normal){};
+
+    bool operator>(const TransTriaInfo &other) const {
+      return deep > other.deep;
+    }
+    bool operator<(const TransTriaInfo &other) const {
+      return deep < other.deep;
+    }
+    bool operator==(const TransTriaInfo &other) const {
+      return deep == other.deep;
+    }
+
+    static bool CompareFunc(const TransTriaInfo &item1,
+                            const TransTriaInfo &item2) {
+      return item1.deep > item2.deep;
+    };
+
+    const Triangle *triaP;
+    float alpha;
+    float deep;
+    Vector3f rayDir;
+    Vector3f hitPos;
+    Vector2f uv;
+    Vector3f normal;
+  };
+#pragma endregion
+
   auto trias = _GetTriasFromBVH(ray);
+  vector<TransTriaInfo> transTriainfos;
+  // pass 1
   for (auto triaP : trias) {
     auto triaPos = triaP->RayIntersect(ray);
     if (ray.deep < System3D::ZBuffer(x, y)) {
@@ -202,12 +245,69 @@ void System3D::_SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
       const auto normal = triaP->VaryingNormal(triaPos);
       const auto uv = triaP->VaryingUV(triaPos);
 
-      auto color = triaP->material->SampleEmitionColor(normal, ray.dir, uv);
+      auto alpha = triaP->material->SampleAlpha(normal, ray.dir, uv);
+      // if not transmission
+      if (alpha > 1.0f - 1e-6f) {
+        auto diffuseColor =
+            triaP->material->SampleDiffuseColor(normal, ray.dir, uv);
+        auto specularColor =
+            triaP->material->SampleSpecularColor(normal, ray.dir, uv);
 
-      auto diffuseColor =
-          triaP->material->SampleDiffuseColor(normal, ray.dir, uv);
-      auto specularColor =
-          triaP->material->SampleDiffuseColor(normal, ray.dir, uv);
+        Vector3f color =
+            triaP->material->SampleEmitionColor(normal, ray.dir, uv);
+
+        for (auto light : lightsRef) {
+          // if not in shadow
+          if (light->CanLighting(pos)) {
+            auto lightRay = pos - light->axis.origin;
+            auto lightRayLen = lightRay.norm();
+            auto lightRayDir = lightRay / lightRayLen;
+
+            auto cosNormalLight = -lightRayDir.dot(normal);
+            if (cosNormalLight > 0) {
+              auto lightLuminance =
+                  light->intensity / (lightRayLen * lightRayLen);
+              // diffuse
+              color +=
+                  cosNormalLight * diffuseColor.cwiseProduct(lightLuminance);
+              // specular
+              color +=
+                  pow(-(lightRayDir + ray.dir).normalized().dot(normal), 60) *
+                  specularColor.cwiseProduct(lightLuminance);
+            }
+          }
+        }
+
+        color += diffuseColor.cwiseProduct(skyBox.emitionColor);
+
+        // Set pixel color
+        System3D::SetBufferColor(
+            x, y, Vector4f(color.x(), color.y(), color.z(), 1.0f));
+        System3D::SetZBuffer(x, y, ray.deep);
+      } else {
+        transTriainfos.emplace_back(triaP, alpha, ray.deep, ray.dir, pos, uv,
+                                    normal);
+      }
+    }
+  }
+
+  // pass 2: transmission
+  std::sort(transTriainfos.begin(), transTriainfos.end(),
+            TransTriaInfo::CompareFunc);
+  for (const auto &transTriainfo : transTriainfos) {
+    if (transTriainfo.deep < System3D::ZBuffer(x, y)) {
+
+      const auto triaP = transTriainfo.triaP;
+      const auto normal = transTriainfo.normal;
+      const auto uv = transTriainfo.uv;
+      const auto pos = transTriainfo.hitPos;
+
+      const Vector3f diffuseColor =
+          triaP->material->SampleDiffuseColor(normal, transTriainfo.rayDir, uv);
+      const Vector3f specularColor = triaP->material->SampleSpecularColor(
+          normal, transTriainfo.rayDir, uv);
+
+      Vector3f color = Vector3f::Zero();
 
       for (auto light : lightsRef) {
         // if not in shadow
@@ -216,12 +316,13 @@ void System3D::_SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
           auto lightRayLen = lightRay.norm();
           auto lightRayDir = lightRay / lightRayLen;
 
-          auto cosNormalLight = -lightRayDir.dot(normal);
+          const float cosNormalLight = -lightRayDir.dot(normal);
           if (cosNormalLight > 0) {
-            auto lightLuminance =
+            const Vector3f lightLuminance =
                 light->intensity / (lightRayLen * lightRayLen);
             // diffuse
-            color += cosNormalLight * diffuseColor.cwiseProduct(lightLuminance);
+            color +=
+                cosNormalLight * (diffuseColor.cwiseProduct(lightLuminance));
             // specular
             color +=
                 pow(-(lightRayDir + ray.dir).normalized().dot(normal), 60) *
@@ -230,12 +331,18 @@ void System3D::_SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
         }
       }
 
-      color += triaP->material->diffuseColor.cwiseProduct(skyBox.emitionColor);
+      color += diffuseColor.cwiseProduct(skyBox.emitionColor);
 
-      // Set pixel color
-      System3D::SetBufferColor(x, y,
-                               Vector4f(color.x(), color.y(), color.z(), 1.0f));
-      System3D::SetZBuffer(x, y, ray.deep);
+      const float alpha = transTriainfo.alpha;
+      const Vector4f originColor = System3D::BufferColor(x, y);
+      const Vector4f newColor = Vector4f(color.x(), color.y(), color.z(), 1.0f);
+      Vector4f emitionColor = Vector4f::Zero();
+      emitionColor.block<3, 1>(0, 0) =
+          triaP->material->SampleEmitionColor(normal, transTriainfo.rayDir, uv);
+      const Vector4f blendColor =
+          originColor * (1.0f - alpha) + newColor * alpha + emitionColor;
+
+      System3D::SetBufferColor(x, y, blendColor);
     }
   }
 }
@@ -378,9 +485,9 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
     normalColor += infos.HitNormal();
     albedoColor += infos.HitAlbedo();
   }
-  color /= pixelSampleTimes;
-  normalColor /= pixelSampleTimes;
-  albedoColor /= pixelSampleTimes;
+  color /= static_cast<float>(pixelSampleTimes);
+  normalColor /= static_cast<float>(pixelSampleTimes);
+  albedoColor /= static_cast<float>(pixelSampleTimes);
 
   // Set pixel color
   System3D::SetBufferColor(x, y,
@@ -414,9 +521,9 @@ void System3D::_DrawTrianglesInRangePixel(const Vector2i &xRange,
 
   current_x += xRange.x() * nearplane_height_step;
   start_y += yRange.x() * nearplane_width_step;
-  for (uint32_t x = xRange.x(); x < xRange.y(); ++x) {
+  for (int x = xRange.x(); x < xRange.y(); ++x) {
     auto current_y = start_y;
-    for (uint32_t y = yRange.x(); y < yRange.y(); ++y) {
+    for (int y = yRange.x(); y < yRange.y(); ++y) {
 
       // Sample
       if constexpr (IS_RAY_TRACING) {

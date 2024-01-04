@@ -270,6 +270,22 @@ public:
 
   static void ClearBuffer() { system->_ClearBuffer(); }
 
+  static Vector4f BufferColor(const uint32_t x, const uint32_t y) {
+    if (x >= system->window_x) {
+      return Vector4f::Zero();
+    }
+    if (y >= system->window_y) {
+      return Vector4f::Zero();
+    }
+
+    return system->colorBuffer[IndFromXY(x, y)];
+  }
+
+  static Vector4f BufferColor(const float x, const float y) {
+    return BufferColor(static_cast<uint32_t>(system->window_x * x),
+                       static_cast<uint32_t>(system->window_y * y));
+  }
+
   static void SetBufferColor(const uint32_t w, const uint32_t h,
                              const Vector4f &value) {
     if (w >= system->window_x) {
@@ -365,10 +381,10 @@ public:
 
   static float ZBuffer(const uint32_t x, const uint32_t y) {
     if (x >= system->window_x) {
-      return 0.0;
+      return 0.0f;
     }
     if (y >= system->window_y) {
-      return 0.0;
+      return 0.0f;
     }
     auto zBuffer = system->zBuffer;
     return zBuffer[IndFromXY(x, y)];
