@@ -4,7 +4,7 @@ struct SamplePointInfo {
   SamplePointInfo() = default;
   SamplePointInfo(const SamplePointInfo &other) = default;
 
-  uint32_t sampleDeep = 0;
+  int sampleDeep = 0; // times of ray bounced
 
   uint32_t ind = 0;
   uint32_t fromInd = 0;
@@ -113,7 +113,7 @@ public:
 };
 
 void SamplePointInfos::PushSamplePointInfo(SamplePointInfo &info, Ray &ray) {
-  info.sampleDeep = ray.sampleInfo.sampleDeep + 1;
+  info.sampleDeep = info.sampleDeep + 1;
 
   info.ind = sampleInfos.size();
   info.fromInd = ray.sampleInfo.ind;

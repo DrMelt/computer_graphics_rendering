@@ -284,6 +284,12 @@ void System3D::_SampleTrianglesInOnePixelWithMaterial(const Matrix4f &toView,
         System3D::SetBufferColor(
             x, y, Vector4f(color.x(), color.y(), color.z(), 1.0f));
         System3D::SetZBuffer(x, y, ray.deep);
+
+        system->albedoBuffer[IndFromXY(x, y)] = Vector4f(
+            diffuseColor.x(), diffuseColor.y(), diffuseColor.z(), 1.0f);
+        system->normalBuffer[IndFromXY(x, y)] =
+            Vector4f(normal.x(), normal.y(), normal.z(), 1.0f);
+
       } else {
         transTriainfos.emplace_back(triaP, alpha, ray.deep, ray.dir, pos, uv,
                                     normal);
@@ -387,6 +393,7 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
   Vector3f albedoColor = Vector3f::Zero();
   for (uint32_t i = 0; i < pixelSampleTimes; i++) {
     Ray originRay;
+
     if constexpr (IS_PERSPECTIVE_PROJECT) {
       originRay.dir =
           Vector3f(current_y + nearplane_width_step * random_0_to_1(),
@@ -411,59 +418,119 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
       auto ray = rays.top();
       rays.pop();
 
-      if (ray.sampleInfo.sampleDeep < pixelSampleDeep) {
+      if (ray.sampleInfo.sampleDeep < pixelSampleDeep &&
+          ray.sampleInfo.weight > 0.0f) {
         _RaySample(ray);
         // const Ray ray = ray;
 
-        // ray hitted mesh And deep
+        // ray hitted mesh And deep is not infinity
         if (ray.IsThisRayPathHitted()) {
           // spaw new rays
 
-          // diffuse
-          if (ray.sampleInfo.material->transparency < 1.0f) {
-            Ray rayCopy = ray;
-            SamplePointInfo diffuseRayInfo = rayCopy.sampleInfo;
+          // get alpha
+          const auto alpha = ray.sampleInfo.material->SampleAlpha(
+              ray.sampleInfo.normal, ray.sampleInfo.inDir, ray.sampleInfo.uv);
 
-            // sample new ray dir
-            auto newDir = diffuseRayInfo.material->SampleDiffuseOutDir(
-                diffuseRayInfo.normal, diffuseRayInfo.inDir,
-                diffuseRayInfo.weight);
-            rayCopy.origin = diffuseRayInfo.pos;
-            rayCopy.dir = newDir;
+          // alpha
+          if (alpha < 1.0f - 1e-8f) {
+            Ray rayCopy = ray; // new ray
+            SamplePointInfo alphaRayInfo = rayCopy.sampleInfo;
 
-            diffuseRayInfo.color = diffuseRayInfo.material->SampleDiffuseColor(
-                diffuseRayInfo.normal, diffuseRayInfo.inDir, diffuseRayInfo.uv);
-            diffuseRayInfo.emition =
-                diffuseRayInfo.material->SampleEmitionColor(
-                    diffuseRayInfo.normal, diffuseRayInfo.inDir,
-                    diffuseRayInfo.uv);
+            rayCopy.origin = alphaRayInfo.pos;
+            rayCopy.dir = alphaRayInfo.inDir;
 
-            infos.PushSamplePointInfo(diffuseRayInfo, rayCopy);
+            alphaRayInfo.weight *= (1.0f - alpha);
+            alphaRayInfo.color = Vector3f::Ones();
+            alphaRayInfo.emition = Vector3f::Zero();
+
+            alphaRayInfo.sampleDeep -= 1;
+            infos.PushSamplePointInfo(alphaRayInfo, rayCopy);
             rays.push(rayCopy);
           }
 
-          // transmision
-          if (ray.sampleInfo.material->transparency > 0.0f) {
-            Ray rayCopy = ray;
-            auto transmisionRayInfo = rayCopy.sampleInfo;
+          if (alpha > 0.0f) {
+            // emission
+            {
+              Ray rayCopy = ray;
+              SamplePointInfo emissionRayInfo = rayCopy.sampleInfo;
 
-            auto newDir = transmisionRayInfo.material->SampleTransmissionOutDir(
-                transmisionRayInfo.normal, transmisionRayInfo.inDir,
-                transmisionRayInfo.weight);
-            rayCopy.origin = transmisionRayInfo.pos;
-            rayCopy.dir = newDir;
+              emissionRayInfo.emition =
+                  emissionRayInfo.material->SampleEmitionColor(
+                      emissionRayInfo.normal, emissionRayInfo.inDir,
+                      emissionRayInfo.uv);
 
-            transmisionRayInfo.color =
-                transmisionRayInfo.material->SampleTransmissionColor(
-                    transmisionRayInfo.normal, transmisionRayInfo.inDir,
-                    transmisionRayInfo.uv);
-            transmisionRayInfo.emition =
-                transmisionRayInfo.material->SampleEmitionColor(
-                    transmisionRayInfo.normal, transmisionRayInfo.inDir,
-                    transmisionRayInfo.uv);
+              infos.PushSamplePointInfo(emissionRayInfo, rayCopy);
+            }
 
-            infos.PushSamplePointInfo(transmisionRayInfo, rayCopy);
-            rays.push(rayCopy);
+            // reflection
+            {
+              Ray rayCopy = ray;
+              SamplePointInfo reflectionRayInfo = rayCopy.sampleInfo;
+
+              // sample new ray dir
+              auto newWeight = reflectionRayInfo.weight;
+              auto newDir = reflectionRayInfo.material->SampleReflectionOutDir(
+                  reflectionRayInfo.normal, reflectionRayInfo.inDir, newWeight);
+              reflectionRayInfo.weight = newWeight * alpha;
+
+              rayCopy.origin = reflectionRayInfo.pos;
+              rayCopy.dir = newDir;
+
+              reflectionRayInfo.color =
+                  reflectionRayInfo.material->SampleSpecularColor(
+                      reflectionRayInfo.normal, reflectionRayInfo.inDir,
+                      reflectionRayInfo.uv);
+
+              infos.PushSamplePointInfo(reflectionRayInfo, rayCopy);
+              rays.push(rayCopy);
+            }
+
+            // diffuse
+            if (ray.sampleInfo.material->transparency < 1.0f) {
+              Ray rayCopy = ray;
+              SamplePointInfo diffuseRayInfo = rayCopy.sampleInfo;
+
+              // sample new ray dir
+              auto newWeight = diffuseRayInfo.weight;
+              auto newDir = diffuseRayInfo.material->SampleDiffuseOutDir(
+                  diffuseRayInfo.normal, diffuseRayInfo.inDir, newWeight);
+              diffuseRayInfo.weight = newWeight * alpha;
+
+              rayCopy.origin = diffuseRayInfo.pos;
+              rayCopy.dir = newDir;
+
+              diffuseRayInfo.color =
+                  diffuseRayInfo.material->SampleDiffuseColor(
+                      diffuseRayInfo.normal, diffuseRayInfo.inDir,
+                      diffuseRayInfo.uv);
+
+              infos.PushSamplePointInfo(diffuseRayInfo, rayCopy);
+              rays.push(rayCopy);
+            }
+
+            // transmision
+            if (ray.sampleInfo.material->transparency > 0.0f) {
+              Ray rayCopy = ray;
+              auto transmisionRayInfo = rayCopy.sampleInfo;
+
+              auto newWeight = transmisionRayInfo.weight;
+              auto newDir =
+                  transmisionRayInfo.material->SampleTransmissionOutDir(
+                      transmisionRayInfo.normal, transmisionRayInfo.inDir,
+                      newWeight);
+              transmisionRayInfo.weight = newWeight * alpha;
+
+              rayCopy.origin = transmisionRayInfo.pos;
+              rayCopy.dir = newDir;
+
+              transmisionRayInfo.color =
+                  transmisionRayInfo.material->SampleTransmissionColor(
+                      transmisionRayInfo.normal, transmisionRayInfo.inDir,
+                      transmisionRayInfo.uv);
+
+              infos.PushSamplePointInfo(transmisionRayInfo, rayCopy);
+              rays.push(rayCopy);
+            }
           }
         }
 

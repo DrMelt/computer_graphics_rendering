@@ -87,6 +87,16 @@ Vector3f MapTexture2DirInCylinder(const Vector2f &imagePos) {
 }
 #pragma endregion
 
+uint64_t CVImageIndStart(const uint32_t x, const uint32_t y, const int height,
+                         const int width, const float xScale,
+                         const float yScale, const int channels) {
+  return ((height - static_cast<uint64_t>(1) -
+           static_cast<uint32_t>(xScale * x)) *
+              width +
+          static_cast<uint32_t>(yScale * y)) *
+         channels;
+}
+
 template <class T> struct Texture {
 protected:
   uint32_t dataLen = 0;
@@ -167,10 +177,10 @@ public:
   T Sample(const float x, const float y) const {
     auto mod_x = fmodf(x, 1.0f - 1e-8f), mod_y = fmodf(y, 1.0f - 1e-8f);
     if (mod_x < 0) {
-      mod_x += 1.0f;
+      mod_x += 1.0f - 1e-8f;
     }
     if (mod_y < 0) {
-      mod_y += 1.0f;
+      mod_y += 1.0f - 1e-8f;
     }
 
     return GetData(static_cast<uint32_t>(mod_x * size.x()),
@@ -189,24 +199,19 @@ public:
 void Texture<Vector3f>::ReadImage(const string &filePath) {
   const float pixelValueScale = 1.0f / 255.0f;
   cv::Mat I = cv::imread(filePath);
-  auto imageData = I.data;
+  const uint8_t *const imageData = I.data;
   // image size
   const int height = I.rows;
   const int width = I.cols;
   const int channels = I.channels();
 
-  float xScale = static_cast<float>(height) / size.x();
-  float yScale = static_cast<float>(width) / size.y();
-
-  auto imageIndStart = [height, width, xScale, yScale, channels](
-                           const uint32_t x, const uint32_t y) -> uint32_t {
-    return ((height - 1 - floor(xScale * x)) * width + floor(yScale * y)) *
-           channels;
-  };
+  const float xScale = static_cast<float>(height) / size.x();
+  const float yScale = static_cast<float>(width) / size.y();
 
   for (int x = 0; x < size.x(); ++x) {
     for (int y = 0; y < size.y(); ++y) {
-      auto indStart = imageIndStart(x, y);
+      auto indStart =
+          CVImageIndStart(x, y, height, width, xScale, yScale, channels);
       data[GetIndFromXY(x, y)] =
           Vector3f(imageData[indStart + 2], imageData[indStart + 1],
                    imageData[indStart]) *
@@ -218,7 +223,7 @@ void Texture<Vector3f>::ReadImage(const string &filePath) {
 void Texture<Vector3f>::ReadImageAndMatchSize(const string &filePath) {
   const float pixelValueScale = 1.0f / 255.0f;
   cv::Mat I = cv::imread(filePath);
-  auto imageData = I.data;
+  const uint8_t *const imageData = I.data;
   // image size
   const int height = I.rows;
   const int width = I.cols;
@@ -226,18 +231,14 @@ void Texture<Vector3f>::ReadImageAndMatchSize(const string &filePath) {
 
   ReSize(height, width);
 
-  float xScale = static_cast<float>(height) / size.x();
-  float yScale = static_cast<float>(width) / size.y();
-
-  auto imageIndStart = [height, width, xScale, yScale, channels](
-                           const uint32_t x, const uint32_t y) -> uint32_t {
-    return ((height - 1 - floor(xScale * x)) * width + floor(yScale * y)) *
-           channels;
-  };
+  const float xScale = static_cast<float>(height) / size.x();
+  const float yScale = static_cast<float>(width) / size.y();
 
   for (int x = 0; x < size.x(); ++x) {
     for (int y = 0; y < size.y(); ++y) {
-      auto indStart = imageIndStart(x, y);
+      auto indStart =
+          CVImageIndStart(x, y, height, width, xScale, yScale, channels);
+
       data[GetIndFromXY(x, y)] =
           Vector3f(imageData[indStart + 2], imageData[indStart + 1],
                    imageData[indStart]) *
@@ -260,15 +261,10 @@ void Texture<float>::ReadImageAndMatchSize(const string &filePath) {
   float xScale = static_cast<float>(height) / size.x();
   float yScale = static_cast<float>(width) / size.y();
 
-  auto imageIndStart = [height, width, xScale, yScale, channels](
-                           const uint32_t x, const uint32_t y) -> uint32_t {
-    return ((height - 1 - floor(xScale * x)) * width + floor(yScale * y)) *
-           channels;
-  };
-
   for (int x = 0; x < size.x(); ++x) {
     for (int y = 0; y < size.y(); ++y) {
-      auto indStart = imageIndStart(x, y);
+      auto indStart =
+          CVImageIndStart(x, y, height, width, xScale, yScale, channels);
       data[GetIndFromXY(x, y)] = imageData[indStart];
     }
   }
@@ -290,16 +286,12 @@ void Texture<float>::ReadAlpahFromImageAndMatchSize(const string &filePath) {
 
   // if image has alpha channel
   if (channels > 3) {
-    auto imageIndStart = [height, width, xScale, yScale, channels](
-                             const uint32_t x, const uint32_t y) -> uint32_t {
-      return ((height - 1 - floor(xScale * x)) * width + floor(yScale * y)) *
-             channels;
-    };
 
     for (int x = 0; x < size.x(); ++x) {
       for (int y = 0; y < size.y(); ++y) {
-        auto indStart = imageIndStart(x, y);
-        data[GetIndFromXY(x, y)] = imageData[indStart + 3];
+        auto indStart =
+            CVImageIndStart(x, y, height, width, xScale, yScale, channels);
+        data[GetIndFromXY(x, y)] = imageData[indStart + 3] * pixelValueScale;
       }
     }
   } else {

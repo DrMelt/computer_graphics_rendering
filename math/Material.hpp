@@ -18,6 +18,15 @@
 using namespace std;
 using namespace Eigen;
 
+/*
+    Fresnel approximation
+    normal and inDir should be normalized
+*/
+float Fresnel(const float f0, const float inDirProject,
+              const float IOR = 1.0f) {
+  return f0 + (1 - f0) * powf(inDirProject * IOR, 4);
+}
+
 struct Material {
 public:
   string name;
@@ -165,24 +174,48 @@ public:
     // to air
     if (inDirProject > 0.0f) {
       sinOut = sinIn * IOR;
+      weight *= Fresnel(0.1f, inDirProject, IOR);
     }
     // to inner
     else {
       sinOut = sinIn / IOR;
+      weight *= -Fresnel(0.1f, -inDirProject, 1.0f);
     }
 
     Vector3f newDir;
     // total reflection
     if (sinOut > 1.0f) {
-      newDir = -inDir + 2 * dirVertical;
+      weight = 0.0f;
     }
-    // refrection
+    // refraction
     else {
       newDir =
           (normal * inDirProject).normalized() * sqrt(1 - sinOut * sinOut) +
           dirVertical.normalized() * sinOut;
       newDir = newDir.normalized();
     }
+
+    return newDir;
+  }
+
+  virtual Vector3f SampleReflectionOutDir(const Vector3f &normal,
+                                          const Vector3f &inDir,
+                                          float &weight) const {
+
+    const auto inDirProject = normal.dot(inDir);
+    const auto dirVertical = inDir - normal * inDirProject;
+
+    // in
+    if (inDirProject > 0.0f) {
+      weight *= (1.0f - Fresnel(0.1f, inDirProject, IOR));
+    }
+    // out
+    else {
+      weight *= (1.0f - Fresnel(0.1f, -inDirProject, 1.0f));
+    }
+
+    Vector3f newDir;
+    newDir = -inDir + 2 * dirVertical;
 
     return newDir;
   }

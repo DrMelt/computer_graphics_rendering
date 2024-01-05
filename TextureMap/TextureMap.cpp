@@ -32,7 +32,6 @@ const float rotateSpeed = 0.5f;
 
 Geometry *model = nullptr, *meshLight = nullptr;
 Light light1, light2, light3;
-// Texture<Vector3f> hdr(2048, 4096);
 
 void Init() {
   auto system = System3D::InitSystem();
@@ -49,11 +48,11 @@ void Init() {
     system->activeCamera->nearplane_width *= 10;
   }
 
-  System3D::SetPixelSampleTimes(8);
-  System3D::SetPixelSampleDeep(5);
+  System3D::SetPixelSampleTimes(16);
+  System3D::SetPixelSampleDeep(3);
   System3D::SetThreads(8);
 
-  light1.axis.origin = Vector3f(0, 3, 6);
+  light1.axis.origin = Vector3f(0, 8, -10);
   light1.intensity = Vector3f(100, 100, 100);
   light2.axis.origin = Vector3f(5, 0, -5);
   light2.intensity = Vector3f(20, 20, 20);
@@ -68,12 +67,12 @@ void Init() {
   // const string folderPath = "models/hw11/";
   // model = ReadOBJ(folderPath + "11-04-16/11-04-16.obj");
   model = ReadOBJ(folderPath + "bighw/stage.obj");
-  meshLight = ReadOBJ(folderPath + "light.obj");
+  meshLight = ReadOBJ(folderPath + "bighw/light.obj");
 
   Material *lightMaterial = new Material;
   lightMaterial->diffuseColor = Vector3f::Zero();
   lightMaterial->specularColor = Vector3f::Zero();
-  lightMaterial->emitionColor = Vector3f(100, 100, 100);
+  lightMaterial->emitionColor = Vector3f(150, 150, 150);
   meshLight->AssignMaterial(lightMaterial);
 
   model->FlipX();
@@ -90,10 +89,10 @@ void Init() {
   System3D::BuildBVH();
 
   // Read hdr and set
-  Texture<Vector3f> hdr(2048, 4096);
-  hdr.ReadImage(folderPath + "/TextureText/sky_linekotsi_03.png");
+  Texture<Vector3f> hdr(0, 0);
+  hdr.ReadImageAndMatchSize(folderPath + "/bighw/textures/sky.png");
   system->skyBox.texture = new Texture(hdr);
-  system->skyBox.emitionColor = Vector3f(0.5f, 0.5f, 0.5f);
+  system->skyBox.emitionColor = Vector3f(0.3f, 0.3f, 0.3f);
 
   if constexpr (!IS_RAY_TRACING) {
     System3D::RefreshShadowMap();
@@ -113,13 +112,13 @@ void display(void) {
   // light.ShowShadowMapToBuffer(0.1f);
 
   if constexpr (IS_RAY_TRACING) {
-    System3D::DenoiseForBuffer();
+    // System3D::DenoiseForBuffer();
   }
 
   // System3D::DrawNormalToBuffer();
-  // System3D::DrawAlbedoToBuffer();
+  //  System3D::DrawAlbedoToBuffer();
 
-  // System3D::ShowTextureToBuffer(System3D::GetSystem()->skyBox.texture);
+  // System3D::ShowTextureToBuffer(*System3D::GetSystem()->skyBox.texture);
 
   System3D::ShowBuffer();
 

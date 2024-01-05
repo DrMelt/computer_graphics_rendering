@@ -262,7 +262,7 @@ Geometry *ReadOBJ(const string &filePath) {
     // vertex uv
     else if (prefix == string("vt")) {
       auto words = SlpitString(line);
-      Vector2f uv = {stof(words[0]), stof(words[1])};
+      Vector2f uv = {stof(words[1]), stof(words[0])};
       uvs.push_back(uv);
     }
     // faces

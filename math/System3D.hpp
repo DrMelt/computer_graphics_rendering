@@ -459,7 +459,7 @@ public:
   uint32_t pixelSampleDeep = 3;
 
   uint32_t drawThreads = 8;
-  uint32_t clipX = 50;
+  uint32_t clipX = 1;
   SkyBox skyBox;
 
 protected:
