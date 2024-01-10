@@ -4,7 +4,7 @@ struct SamplePointInfo {
   SamplePointInfo() = default;
   SamplePointInfo(const SamplePointInfo &other) = default;
 
-  int sampleDeep = 0; // times of ray bounced
+  System3D::SampleDeep sampleDeep = {0, 0}; // times of ray bounced
 
   uint32_t ind = 0;
   uint32_t fromInd = 0;
@@ -33,13 +33,13 @@ public:
   Vector3f AccColor() const {
     vector<SamplePointInfo> sampleInfoCopy = sampleInfos;
 
-    int ind = sampleInfoCopy.size() - 1;
+    long ind = sampleInfoCopy.size() - 1;
 
-    while (true) {
+    while (ind > -1) {
       if (ind > 0) {
         auto &info = sampleInfoCopy[ind];
         sampleInfoCopy[info.fromInd].accColor +=
-            info.emition + info.weight * info.accColor.cwiseProduct(info.color);
+            info.weight * (info.emition + info.accColor.cwiseProduct(info.color));
       } else if (ind > -1) {
         auto &info = sampleInfoCopy[0];
 
@@ -54,15 +54,7 @@ public:
     return Vector3f::Zero();
   }
 
-  bool IsThisRayPathContinue(const uint32_t maxTimes) const {
-    if (sampleInfos.size() < 1) {
-      return true;
-    } else {
-      return (sampleInfos)[sampleInfos.size() - 1].sampleDeep < maxTimes;
-    }
-  }
-
-  uint32_t ThisRayPathDeep() const {
+  System3D::SampleDeep ThisRayPathDeep() const {
     return (sampleInfos)[sampleInfos.size() - 1].sampleDeep;
   }
 
@@ -103,7 +95,7 @@ public:
 
 public:
   bool IsThisRayPathHit() const {
-    return deep < numeric_limits<float>::infinity();
+    return deep < numeric_limits<float>::infinity() && deep > 1e-6f;
   }
 
   void Transform(const Matrix4f &transM) {
@@ -113,7 +105,6 @@ public:
 };
 
 void SamplePointInfos::PushSamplePointInfo(SamplePointInfo &info, Ray &ray) {
-  info.sampleDeep = info.sampleDeep + 1;
 
   info.ind = sampleInfos.size();
   info.fromInd = ray.sampleInfo.ind;

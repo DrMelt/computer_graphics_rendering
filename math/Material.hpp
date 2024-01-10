@@ -151,7 +151,7 @@ public:
     const float x_1 = random_0_to_1(), x_2 = random_0_to_1();
     const float theta = M_PI_2 - acosf(x_1);
     const auto rateZ = sinf(theta);
-    weight *= rateZ * (1.0f - transparency);
+    weight = rateZ * (1.0f - transparency);
 
     const float r = std::sqrt(1.0f - rateZ * rateZ), phi = 2 * M_PI * x_2;
     const Vector3f localRay(r * std::cos(phi), r * std::sin(phi), rateZ);
@@ -174,12 +174,12 @@ public:
     // to air
     if (inDirProject > 0.0f) {
       sinOut = sinIn * IOR;
-      weight *= Fresnel(0.1f, inDirProject, IOR);
+      weight = Fresnel(0.1f, inDirProject, IOR);
     }
     // to inner
     else {
       sinOut = sinIn / IOR;
-      weight *= -Fresnel(0.1f, -inDirProject, 1.0f);
+      weight = -Fresnel(0.1f, -inDirProject, 1.0f);
     }
 
     Vector3f newDir;
@@ -207,11 +207,11 @@ public:
 
     // in
     if (inDirProject > 0.0f) {
-      weight *= (1.0f - Fresnel(0.1f, inDirProject, IOR));
+      weight = (1.0f - Fresnel(0.1f, inDirProject, IOR));
     }
     // out
     else {
-      weight *= (1.0f - Fresnel(0.1f, -inDirProject, 1.0f));
+      weight = (1.0f - Fresnel(0.1f, -inDirProject, 1.0f));
     }
 
     Vector3f newDir;

@@ -12,6 +12,8 @@ public:
   Axis axis;
   Texture<float> *shadowMap = nullptr;
 
+  uint32_t shadowMapHeight = 512;
+
   Light() = default;
   virtual ~Light() {
     if (shadowMap != nullptr) {
@@ -39,7 +41,7 @@ public:
 
   virtual void RefreshShadowMap() {
     if (shadowMap == nullptr) {
-      shadowMap = new Texture<float>(2048, 2048 * 6);
+      shadowMap = new Texture<float>(shadowMapHeight, shadowMapHeight * 6);
     }
 
     shadowMap->Fill(numeric_limits<float>::infinity());
@@ -61,7 +63,7 @@ public:
 
   virtual void RefreshShadowMapMultiThreads() {
     if (shadowMap == nullptr) {
-      shadowMap = new Texture<float>(2048, 2048 * 6);
+      shadowMap = new Texture<float>(shadowMapHeight, shadowMapHeight * 6);
     }
 
     shadowMap->Fill(numeric_limits<float>::infinity());

@@ -24,9 +24,13 @@ int farplane_distance = 3000; // 视景体远平面与视点距离
 int window_x = 600;
 int window_y = 800;
 
-Vector3f eyePos = {0, 1.0f, 0};
 Vector3f lookAtPos = {0, 1.0f, -10};
+Vector3f eyePos = {0, 1.0f, 0};
 Vector3f eyeUp = {0, 1, 0};
+
+// Vector3f lookAtPos = {0, 1.0f, 0.0f};
+// Vector3f eyePos = {0, 20.0f, 0};
+// Vector3f eyeUp = {0, 0, -1};
 
 Geometry *model = nullptr, *meshLight = nullptr;
 Light light1, light2, light3;
@@ -46,24 +50,24 @@ void Init() {
     system->activeCamera->nearplane_width *= 10;
   }
 
-  System3D::SetPixelSampleTimes(8);
-  System3D::SetPixelSampleDeep(3);
+  System3D::SetPixelSampleTimes(32);
+  System3D::SetPixelSampleDeep({3, 20});
   System3D::SetThreads(8);
 
-  light1.axis.origin = Vector3f(0, 8, -10);
-  light1.intensity = Vector3f(100, 100, 100);
-  light2.axis.origin = Vector3f(5, 0, -5);
-  light2.intensity = Vector3f(20, 20, 20);
-  light3.axis.origin = Vector3f(-5, 0, 5);
-  light3.intensity = Vector3f(20, 20, 20);
+  light1.axis.origin = Vector3f(0, 16, -20);
+  light1.intensity = Vector3f(200, 200, 200);
+  light1.shadowMapHeight = 2048;
+  light2.axis.origin = Vector3f(1.5f, 2, -2.5f);
+  light2.intensity = Vector3f(3, 3, 3);
+  light3.axis.origin = Vector3f(-1.5f, 2, -2.5f);
+  light3.intensity = Vector3f(3, 3, 3);
   System3D::PushLightRef(&light1);
-  // System3D::PushLightRef(&light2);
-  // System3D::PushLightRef(&light3);
+  System3D::PushLightRef(&light2);
+  System3D::PushLightRef(&light3);
 
   // Read models
   const string folderPath = "../../../../../models/";
   // const string folderPath = "../../models/";
-  //  model = ReadOBJ(folderPath + "11-04-16/11-04-16.obj");
   model = ReadOBJ(folderPath + "bighw/stage.obj");
   meshLight = ReadOBJ(folderPath + "bighw/light.obj");
 
@@ -105,9 +109,11 @@ void display(void) {
   System3D::ClearBuffer();
 
   if constexpr (IS_RAY_TRACING) {
-    System3D::DrawAtReducedSize(Vector2f(0.0f, 1.0f), Vector2f(0.0f, 1.0f),
-                                System3D::GetSystem()->pixelSampleTimes * 16,
-                                0.5f);
+    // System3D::DrawAtReducedSize(Vector2f(0.0f, 1.0f), Vector2f(0.0f, 1.0f),
+    //                             System3D::GetSystem()->pixelSampleTimes * 4,
+    //                             0.5f);
+    System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
+                                              Vector2f(0.0f, 1.0f));
   } else {
     System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
                                               Vector2f(0.0f, 1.0f));
@@ -115,7 +121,7 @@ void display(void) {
   // light.ShowShadowMapToBuffer(0.1f);
 
   if constexpr (IS_RAY_TRACING) {
-    // System3D::DenoiseForBuffer();
+    System3D::DenoiseForBuffer();
   }
 
   // System3D::DrawNormalToBuffer();

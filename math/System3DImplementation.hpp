@@ -133,7 +133,7 @@ vector<const Triangle *> System3D::_GetTriasFromBVH(const Ray &ray) const {
   stack<const BVHNode *> nodes;
   nodes.push(bvhRoot);
   while (!nodes.empty()) {
-    auto node = nodes.top();
+    const auto node = nodes.top();
     nodes.pop();
     if (node->IsIntersection(ray)) {
       if (node->IsLeaf()) {
@@ -157,9 +157,7 @@ vector<const Triangle *> System3D::_GetTriasFromBVH(const Ray &ray) const {
   for (auto nodeP : intersectedNodes) {
     trias.push_back(nodeP->ContainedTriaRef());
   }
-  // if (!intersectedNodes.empty()) {
-  //   trias.push_back(intersectedNodes[0]->ContainedTriaRef());
-  // }
+
   return trias;
 }
 
@@ -358,9 +356,10 @@ void System3D::_RaySample(Ray &ray) {
   Vector3f closestTriaPos;
   float closestTriaDeep = numeric_limits<float>::infinity();
   auto trias = _GetTriasFromBVH(ray);
+  // get closest triangle
   for (auto triaP : trias) {
     auto triaPos = triaP->RayIntersect(ray);
-    if (ray.deep < closestTriaDeep) {
+    if (ray.deep < closestTriaDeep && ray.deep > 1e-6f) {
       closestTriaP = triaP;
       closestTriaPos = triaPos;
       closestTriaDeep = ray.deep;
@@ -391,7 +390,7 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
   Vector3f color = Vector3f::Zero();
   Vector3f normalColor = Vector3f::Zero();
   Vector3f albedoColor = Vector3f::Zero();
-  for (uint32_t i = 0; i < pixelSampleTimes; i++) {
+  for (uint32_t sampleTime = 0; sampleTime < pixelSampleTimes; sampleTime++) {
     Ray originRay;
 
     if constexpr (IS_PERSPECTIVE_PROJECT) {
@@ -419,7 +418,7 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
       rays.pop();
 
       if (ray.sampleInfo.sampleDeep < pixelSampleDeep &&
-          ray.sampleInfo.weight > 0.0f) {
+          ray.sampleInfo.weight > 1e-6f) {
         _RaySample(ray);
         // const Ray ray = ray;
 
@@ -432,20 +431,23 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
               ray.sampleInfo.normal, ray.sampleInfo.inDir, ray.sampleInfo.uv);
 
           // alpha
-          if (alpha < 1.0f - 1e-8f) {
+          if (alpha < 1.0f - 1e-7f) {
             Ray rayCopy = ray; // new ray
             SamplePointInfo alphaRayInfo = rayCopy.sampleInfo;
 
             rayCopy.origin = alphaRayInfo.pos;
             rayCopy.dir = alphaRayInfo.inDir;
 
-            alphaRayInfo.weight *= (1.0f - alpha);
+            alphaRayInfo.weight = (1.0f - alpha);
             alphaRayInfo.color = Vector3f::Ones();
             alphaRayInfo.emition = Vector3f::Zero();
 
-            alphaRayInfo.sampleDeep -= 1;
+            alphaRayInfo.sampleDeep.alphaSample += 1;
             infos.PushSamplePointInfo(alphaRayInfo, rayCopy);
-            rays.push(rayCopy);
+            if (alphaRayInfo.sampleDeep.alphaSample <
+                pixelSampleDeep.alphaSample) {
+              rays.push(rayCopy);
+            }
           }
 
           if (alpha > 0.0f) {
@@ -458,8 +460,9 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
                   emissionRayInfo.material->SampleEmitionColor(
                       emissionRayInfo.normal, emissionRayInfo.inDir,
                       emissionRayInfo.uv);
+              emissionRayInfo.color = Vector3f::Zero();
 
-              emissionRayInfo.weight *= alpha;
+              emissionRayInfo.weight = alpha;
 
               infos.PushSamplePointInfo(emissionRayInfo, rayCopy);
             }
@@ -470,7 +473,7 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
               SamplePointInfo reflectionRayInfo = rayCopy.sampleInfo;
 
               // sample new ray dir
-              auto newWeight = reflectionRayInfo.weight;
+              float newWeight = 0.0f;
               auto newDir = reflectionRayInfo.material->SampleReflectionOutDir(
                   reflectionRayInfo.normal, reflectionRayInfo.inDir, newWeight);
               reflectionRayInfo.weight = newWeight * alpha;
@@ -483,8 +486,12 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
                       reflectionRayInfo.normal, reflectionRayInfo.inDir,
                       reflectionRayInfo.uv);
 
+              reflectionRayInfo.sampleDeep.bsdfSample += 1;
               infos.PushSamplePointInfo(reflectionRayInfo, rayCopy);
-              rays.push(rayCopy);
+              if (reflectionRayInfo.sampleDeep.bsdfSample <
+                  pixelSampleDeep.bsdfSample) {
+                rays.push(rayCopy);
+              }
             }
 
             // diffuse
@@ -493,7 +500,7 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
               SamplePointInfo diffuseRayInfo = rayCopy.sampleInfo;
 
               // sample new ray dir
-              auto newWeight = diffuseRayInfo.weight;
+              auto newWeight = 0.0f;
               auto newDir = diffuseRayInfo.material->SampleDiffuseOutDir(
                   diffuseRayInfo.normal, diffuseRayInfo.inDir, newWeight);
               diffuseRayInfo.weight = newWeight * alpha;
@@ -506,8 +513,12 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
                       diffuseRayInfo.normal, diffuseRayInfo.inDir,
                       diffuseRayInfo.uv);
 
+              diffuseRayInfo.sampleDeep.bsdfSample += 1;
               infos.PushSamplePointInfo(diffuseRayInfo, rayCopy);
-              rays.push(rayCopy);
+              if (diffuseRayInfo.sampleDeep.bsdfSample <
+                  pixelSampleDeep.bsdfSample) {
+                rays.push(rayCopy);
+              }
             }
 
             // transmision
@@ -515,7 +526,7 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
               Ray rayCopy = ray;
               auto transmisionRayInfo = rayCopy.sampleInfo;
 
-              auto newWeight = transmisionRayInfo.weight;
+              auto newWeight = 0.0f;
               auto newDir =
                   transmisionRayInfo.material->SampleTransmissionOutDir(
                       transmisionRayInfo.normal, transmisionRayInfo.inDir,
@@ -530,8 +541,12 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
                       transmisionRayInfo.normal, transmisionRayInfo.inDir,
                       transmisionRayInfo.uv);
 
+              transmisionRayInfo.sampleDeep.bsdfSample += 1;
               infos.PushSamplePointInfo(transmisionRayInfo, rayCopy);
-              rays.push(rayCopy);
+              if (transmisionRayInfo.sampleDeep.bsdfSample <
+                  pixelSampleDeep.bsdfSample) {
+                rays.push(rayCopy);
+              }
             }
           }
         }
@@ -543,6 +558,8 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
           skyRayInfo.material = &skyBox;
           skyRayInfo.emition = skyBox.SampleSkyBoxColor(rayCopy.dir);
           skyRayInfo.color = skyRayInfo.emition;
+
+          skyRayInfo.weight = 1.0f;
 
           infos.PushSamplePointInfo(skyRayInfo, rayCopy);
         }
@@ -607,6 +624,9 @@ void System3D::_DrawTrianglesInRangePixel(const Vector2i &xRange,
     current_x += nearplane_height_step;
   }
 
+  // cout << "end Thread: " << (*runninghreadCount) << "  xCount: " <<
+  // xRange.y()
+  //      << endl;
   (*runninghreadCount)--;
 }
 

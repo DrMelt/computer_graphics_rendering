@@ -478,7 +478,21 @@ protected:
 public:
   // Ray tracing
   uint32_t pixelSampleTimes = 4;
-  uint32_t pixelSampleDeep = 3;
+  struct SampleDeep {
+  public:
+    uint32_t bsdfSample = 3;
+    uint32_t alphaSample = 20;
+
+    bool operator>(const SampleDeep &other) {
+      return bsdfSample > other.bsdfSample || alphaSample > other.alphaSample;
+    }
+
+    bool operator<(const SampleDeep &other) {
+      return bsdfSample < other.bsdfSample || alphaSample < other.alphaSample;
+    }
+  };
+
+  SampleDeep pixelSampleDeep = {3, 20};
 
   uint32_t drawThreads = 8;
   uint32_t clipX = 1;
@@ -514,7 +528,7 @@ public:
   static void SetPixelSampleTimes(const uint32_t times) {
     system->pixelSampleTimes = times;
   }
-  static void SetPixelSampleDeep(const uint32_t deep) {
+  static void SetPixelSampleDeep(const SampleDeep &deep) {
     system->pixelSampleDeep = deep;
   }
   static void SetThreads(const uint32_t threads) {
@@ -713,7 +727,8 @@ protected:
           xCount = xRange.y();
         }
 
-        // cout << "Thread: " << runninghreadCount << endl;
+        cout << "start Thread: " << runninghreadCount << "  xCount: " << xCount
+             << endl;
         thread *const t =
             new thread(&System3D::_DrawTrianglesInRangePixel, this,
                        Vector2i(preX, xCount), yRange, &runninghreadCount);

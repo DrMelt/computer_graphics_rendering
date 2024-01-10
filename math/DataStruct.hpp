@@ -1099,7 +1099,7 @@ public:
     ray.deep = result.z();
     result.z() = gamma;
     // if not in triangle or behind the origin
-    if (alpha < 0 || beta < 0 || gamma < 0 || ray.deep < 1e-5 ||
+    if (alpha < 0 || beta < 0 || gamma < 0 || ray.deep < 1e-6f ||
         isnan(ray.deep)) {
       ray.deep = numeric_limits<float>::infinity();
     }
