@@ -28,8 +28,6 @@ Vector3f eyePos = {0, 1.0f, 0};
 Vector3f lookAtPos = {0, 1.0f, -10};
 Vector3f eyeUp = {0, 1, 0};
 
-const float rotateSpeed = 0.5f;
-
 Geometry *model = nullptr, *meshLight = nullptr;
 Light light1, light2, light3;
 
@@ -48,7 +46,7 @@ void Init() {
     system->activeCamera->nearplane_width *= 10;
   }
 
-  System3D::SetPixelSampleTimes(16);
+  System3D::SetPixelSampleTimes(8);
   System3D::SetPixelSampleDeep(3);
   System3D::SetThreads(8);
 
@@ -64,8 +62,8 @@ void Init() {
 
   // Read models
   const string folderPath = "../../../../../models/";
-  // const string folderPath = "models/hw11/";
-  // model = ReadOBJ(folderPath + "11-04-16/11-04-16.obj");
+  // const string folderPath = "../../models/";
+  //  model = ReadOBJ(folderPath + "11-04-16/11-04-16.obj");
   model = ReadOBJ(folderPath + "bighw/stage.obj");
   meshLight = ReadOBJ(folderPath + "bighw/light.obj");
 
@@ -106,9 +104,14 @@ void display(void) {
 
   System3D::ClearBuffer();
 
-  System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
-                                            Vector2f(0.0f, 1.0f));
-
+  if constexpr (IS_RAY_TRACING) {
+    System3D::DrawAtReducedSize(Vector2f(0.0f, 1.0f), Vector2f(0.0f, 1.0f),
+                                System3D::GetSystem()->pixelSampleTimes * 16,
+                                0.5f);
+  } else {
+    System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
+                                              Vector2f(0.0f, 1.0f));
+  }
   // light.ShowShadowMapToBuffer(0.1f);
 
   if constexpr (IS_RAY_TRACING) {

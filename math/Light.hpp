@@ -78,10 +78,11 @@ public:
       if (runningThreads < maxThreads) {
         auto tP = new thread(&Light::ShadowMapPart, this,
                              Vector2i(yCount - yStep, yCount), &runningThreads);
+        runningThreads++;
         threads.push_back(tP);
         yCount += yStep;
       } else {
-        this_thread::sleep_for(std::chrono::milliseconds(1));
+        this_thread::sleep_for(std::chrono::milliseconds(2));
       }
     }
     auto tP = new thread(&Light::ShadowMapPart, this,
@@ -97,8 +98,6 @@ public:
 
 protected:
   virtual void ShadowMapPart(const Vector2i &yRange, uint32_t *runningThreads) {
-    (*runningThreads)++;
-
     const auto shadowMapSize = shadowMap->Size();
     const float xInverse = 1.0f / shadowMapSize.x(),
                 yInverse = 1.0f / shadowMapSize.y();

@@ -121,8 +121,10 @@ public:
   }
 
   Texture &operator=(const Texture<T> &other) {
-    delete[] data;
-    data = nullptr;
+    if (data != nullptr) {
+      delete[] data;
+      data = nullptr;
+    }
 
     size = other.size;
     dataLen = other.dataLen;
@@ -132,9 +134,10 @@ public:
     }
     data = new T[dataLen];
 
-    for (uint32_t i = 0; i < dataLen; ++i) {
-      data[i] = other.data[i];
-    }
+    // for (uint32_t i = 0; i < dataLen; ++i) {
+    //   data[i] = other.data[i];
+    // }
+    memcpy(data, other.data, dataLen * sizeof(T));
 
     return *this;
     // memcpy(data, other.data, dataLen * sizeof(T));
@@ -170,16 +173,63 @@ public:
     return data[GetIndFromXY(x, y)];
   }
 
+  void SetData(const T *const dataArr) {
+    memcpy(data, dataArr, dataLen * sizeof(T));
+  }
+
   void SetData(const uint32_t x, const uint32_t y, const T &value) {
     data[GetIndFromXY(x, y)] = value;
   }
 
-  T Sample(const float x, const float y) const {
-    auto mod_x = fmodf(x, 1.0f - 1e-8f), mod_y = fmodf(y, 1.0f - 1e-8f);
-    if (mod_x < 0) {
+  enum SampleMethod { Nearest, Bilinear };
+
+  T Sample(const float x, const float y,
+           const SampleMethod method = SampleMethod::Bilinear) const {
+    if (method == SampleMethod::Bilinear) {
+      return SampleBilinear(x, y);
+    } else if (method == SampleMethod::Nearest) {
+      return SampleNearest(x, y);
+    }
+  }
+
+  T SampleBilinear(const float x, const float y) const {
+    float mod_x = fmodf(x - 0.5f * 1.0f / size.x(), 1.0f - 1e-7f),
+          mod_y = fmodf(y - 0.5f * 1.0f / size.y(), 1.0f - 1e-7f);
+    if (mod_x < 0.0f) {
+      mod_x += 1.0f - 1e-7f;
+    }
+    if (mod_y < 0.0f) {
+      mod_y += 1.0f - 1e-7f;
+    }
+
+    const float xScaled = mod_x * size.x(), yScaled = mod_y * size.y();
+    const uint32_t indX = static_cast<uint32_t>(xScaled),
+                   indY = static_cast<uint32_t>(yScaled);
+    uint32_t indX1 = indX + 1, indY1 = indY + 1;
+
+    if (indX1 >= size.x()) {
+      indX1 = indX1 % size.x();
+    }
+    if (indY1 >= size.y()) {
+      indY1 = indY1 % size.y();
+    }
+    T texValue00 = GetData(indX, indY), texValue10 = GetData(indX1, indY),
+      texValue01 = GetData(indX, indY1), texValue11 = GetData(indX1, indY1);
+
+    const float xBlend = xScaled - indX, yBlend = yScaled - indY;
+    const T blendValue =
+        (1 - yBlend) * ((1 - xBlend) * texValue00 + xBlend * texValue10) +
+        yBlend * ((1 - xBlend) * texValue01 + xBlend * texValue11);
+
+    return blendValue;
+  }
+
+  T SampleNearest(const float x, const float y) const {
+    float mod_x = fmodf(x, 1.0f - 1e-8f), mod_y = fmodf(y, 1.0f - 1e-8f);
+    if (mod_x < 0.0f) {
       mod_x += 1.0f - 1e-8f;
     }
-    if (mod_y < 0) {
+    if (mod_y < 0.0f) {
       mod_y += 1.0f - 1e-8f;
     }
 

@@ -408,6 +408,28 @@ public:
                          static_cast<uint32_t>(system->window_y * y), value);
   }
 
+  static Texture<Vector4f> ConverColorBufferToTexture() {
+    Texture<Vector4f> texture(system->window_x, system->window_y);
+    texture.SetData(system->colorBuffer);
+    return texture;
+  }
+
+  static void BlendTextureOnColorBuffer(const Texture<Vector4f> &texture,
+                                        const float alpha) {
+
+    const auto winX = system->window_x, winY = system->window_y;
+    const float xInverse = 1.0f / winX, yInverse = 1.0f / winY;
+    for (uint32_t x = 0; x < winX; x++) {
+      for (uint32_t y = 0; y < winY; y++) {
+        const Vector4f bufferColor = System3D::BufferColor(x, y);
+        const Vector4f texColor = texture.Sample(x * xInverse, y * yInverse);
+        const Vector4f blendColor =
+            alpha * texColor + (1 - alpha) * bufferColor;
+        System3D::SetBufferColor(x, y, blendColor);
+      }
+    }
+  }
+
 protected:
   System3D(const uint32_t window_x = 900, const uint32_t window_y = 900)
       : window_x(window_x), window_y(window_y) {
@@ -547,6 +569,33 @@ public:
     system->_DrawTrianglesInRangeMultiThread(xPercent, yPercent);
   }
 
+  // a Rendering strategy for RayTracing
+  static void DrawAtReducedSize(const Vector2f xPercent,
+                                const Vector2f yPercent,
+                                const int sampleTimesAtReducedSize,
+                                const float sizeScale = 0.5f,
+                                const float blendAlpha = 0.5f) {
+    const auto origin_window_x = system->window_x,
+               origin_window_y = system->window_y;
+
+    const auto origin_pixelSampleTimes = system->pixelSampleTimes;
+
+    system->_SetWindowSize(origin_window_x * sizeScale,
+                           origin_window_y * sizeScale);
+
+    System3D::SetPixelSampleTimes(sampleTimesAtReducedSize);
+
+    System3D::DrawTrianglesInRangeMultiThread(xPercent, yPercent);
+    const auto reducedSizeTex = ConverColorBufferToTexture();
+
+    system->_SetWindowSize(origin_window_x, origin_window_y);
+    System3D::SetPixelSampleTimes(origin_pixelSampleTimes);
+
+    System3D::DrawTrianglesInRangeMultiThread(xPercent, yPercent);
+
+    System3D::BlendTextureOnColorBuffer(reducedSizeTex, blendAlpha);
+  }
+
   static void ShowTextureToBuffer(const Texture<Vector3f> &texture,
                                   const float vaulesScale = 1.0f) {
     auto size = System3D::WindowSize();
@@ -658,21 +707,25 @@ protected:
     int xCount = xRange.x();
     while (xCount < xRange.y()) {
       if (runninghreadCount < this->drawThreads) {
-        int preX = xCount;
+        const int preX = xCount;
         xCount += clipX;
         if (xCount > xRange.y()) {
           xCount = xRange.y();
         }
-        auto t = new thread(&System3D::_DrawTrianglesInRangePixel, this,
-                            Vector2i(preX, xCount), yRange, &runninghreadCount);
+
+        // cout << "Thread: " << runninghreadCount << endl;
+        thread *const t =
+            new thread(&System3D::_DrawTrianglesInRangePixel, this,
+                       Vector2i(preX, xCount), yRange, &runninghreadCount);
+        runninghreadCount++;
         threads.push_back(t);
       } else {
-        this_thread::sleep_for(std::chrono::milliseconds(1));
+        this_thread::sleep_for(std::chrono::milliseconds(2));
       }
     }
 
     // Waiting
-    for (auto tP : threads) {
+    for (const auto &tP : threads) {
       tP->join();
       delete tP;
     }

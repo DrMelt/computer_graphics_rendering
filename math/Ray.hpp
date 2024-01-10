@@ -102,7 +102,7 @@ public:
   Ray(const Ray &other) = default;
 
 public:
-  bool IsThisRayPathHitted() const {
+  bool IsThisRayPathHit() const {
     return deep < numeric_limits<float>::infinity();
   }
 

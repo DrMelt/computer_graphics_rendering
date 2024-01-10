@@ -423,8 +423,8 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
         _RaySample(ray);
         // const Ray ray = ray;
 
-        // ray hitted mesh And deep is not infinity
-        if (ray.IsThisRayPathHitted()) {
+        // ray hit mesh And deep is not infinity
+        if (ray.IsThisRayPathHit()) {
           // spaw new rays
 
           // get alpha
@@ -458,6 +458,8 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
                   emissionRayInfo.material->SampleEmitionColor(
                       emissionRayInfo.normal, emissionRayInfo.inDir,
                       emissionRayInfo.uv);
+
+              emissionRayInfo.weight *= alpha;
 
               infos.PushSamplePointInfo(emissionRayInfo, rayCopy);
             }
@@ -534,7 +536,7 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
           }
         }
 
-        // hitted sky
+        // hit sky
         else {
           Ray rayCopy = ray;
           auto skyRayInfo = rayCopy.sampleInfo;
@@ -575,8 +577,6 @@ void System3D::_DrawSplines() {
 void System3D::_DrawTrianglesInRangePixel(const Vector2i &xRange,
                                           const Vector2i &yRange,
                                           int *const runninghreadCount) {
-  (*runninghreadCount)++;
-
   auto toView = System3D::ToView();
   const float window_x_i = 1.0f / window_x, window_y_i = 1.0f / window_y;
 
