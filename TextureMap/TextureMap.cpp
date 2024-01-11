@@ -50,20 +50,22 @@ void Init() {
     system->activeCamera->nearplane_width *= 10;
   }
 
-  System3D::SetPixelSampleTimes(4);
+  System3D::SetPixelSampleTimes(8);
   System3D::SetPixelSampleDeep({3, 20});
   System3D::SetThreads(8);
 
-  light1.axis.origin = Vector3f(0, 16, -20);
-  light1.intensity = Vector3f(200, 200, 200);
-  light1.shadowMapHeight = 2048;
-  light2.axis.origin = Vector3f(1.5f, 2, -2.5f);
-  light2.intensity = Vector3f(3, 3, 3);
-  light3.axis.origin = Vector3f(-1.5f, 2, -2.5f);
-  light3.intensity = Vector3f(3, 3, 3);
-  System3D::PushLightRef(&light1);
-  System3D::PushLightRef(&light2);
-  System3D::PushLightRef(&light3);
+  if constexpr (!IS_RAY_TRACING) {
+    light1.axis.origin = Vector3f(0, 16, -20);
+    light1.intensity = Vector3f(70, 70, 70);
+    light1.shadowMapHeight = 2048;
+    light2.axis.origin = Vector3f(1.5f, 2, -2.5f);
+    light2.intensity = Vector3f(3, 3, 3);
+    light3.axis.origin = Vector3f(-1.5f, 2, -2.5f);
+    light3.intensity = Vector3f(3, 3, 3);
+    System3D::PushLightRef(&light1);
+    System3D::PushLightRef(&light2);
+    System3D::PushLightRef(&light3);
+  }
 
   // Read models
   const string folderPath = "../../../../../models/";
@@ -74,7 +76,7 @@ void Init() {
   Material *lightMaterial = new Material;
   lightMaterial->diffuseColor = Vector3f::Zero();
   lightMaterial->specularColor = Vector3f::Zero();
-  lightMaterial->emitionColor = Vector3f(80, 80, 80);
+  lightMaterial->emitionColor = Vector3f(200, 200, 200);
   meshLight->AssignMaterial(lightMaterial);
 
   model->FlipX();
@@ -121,7 +123,7 @@ void display(void) {
   // light.ShowShadowMapToBuffer(0.1f);
 
   if constexpr (IS_RAY_TRACING) {
-    // System3D::DenoiseForBuffer();
+    System3D::DenoiseForBuffer();
   }
 
   // System3D::DrawNormalToBuffer();

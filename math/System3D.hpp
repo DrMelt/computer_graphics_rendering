@@ -9,7 +9,6 @@
 #include <Eigen/Geometry>
 #include <OpenImageDenoise/oidn.hpp>
 // clang-format on
-#include "System3DHead.hpp"
 #include "Texture.hpp"
 #include "Transform.hpp"
 #include <iostream>

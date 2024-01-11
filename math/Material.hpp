@@ -151,7 +151,8 @@ public:
     const float x_1 = random_0_to_1(), x_2 = random_0_to_1();
     const float theta = M_PI_2 - acosf(x_1);
     const auto rateZ = sinf(theta);
-    weight = rateZ * (1.0f - transparency) * static_cast<float>(M_PI * 2);
+    //weight = rateZ * (1.0f - transparency) * static_cast<float>(M_PI * 2);
+    weight = rateZ * (1.0f - transparency) ;
 
     const float r = std::sqrt(1.0f - rateZ * rateZ), phi = 2 * M_PI * x_2;
     const Vector3f localRay(r * std::cos(phi), r * std::sin(phi), rateZ);

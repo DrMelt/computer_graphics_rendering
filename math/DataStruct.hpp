@@ -1059,21 +1059,28 @@ public:
   }
 
 public:
-  virtual float Area() const {
-    const auto v1 = vertices[1]->GetPos() - vertices[0]->GetPos(),
-               v2 = vertices[2]->GetPos() - vertices[0]->GetPos();
+  float Area() const {
+    const Vector3f v1 = vertices[1]->GetPos() - vertices[0]->GetPos();
+    const Vector3f v2 = vertices[2]->GetPos() - vertices[0]->GetPos();
 
-    return v1.cross(v2).norm() * 0.5f;
+    // cout << vertices[2]->GetPos() << endl
+    //      << endl
+    //      << vertices[1]->GetPos() << endl
+    //      << endl
+    //      << vertices[0]->GetPos() << endl
+    //      << endl;
+
+    return (v1.cross(v2)).norm() * 0.5f;
   }
 
-  virtual Vector3f ScatterPoint() const {
+  Vector3f ScatterPoint() const {
     const auto v1 = vertices[1]->GetPos() - vertices[0]->GetPos(),
                v2 = vertices[2]->GetPos() - vertices[0]->GetPos();
 
     const float weight1 = random_0_to_1(),
                 weight2 = (1.0f - weight1) * random_0_to_1();
 
-    return v1 * weight1 + v2 * weight2;
+    return v1 * weight1 + v2 * weight2 + vertices[0]->GetPos();
   }
 
   void ComputeNormal() {

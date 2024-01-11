@@ -376,6 +376,7 @@ void System3D::_RaySample(Ray &ray) {
     }
   }
   ray.deep = closestTriaDeep;
+  ray.sampleInfo.triaP = closestTriaP;
 
   // Sample color
   if (closestTriaP != nullptr) {
@@ -383,7 +384,6 @@ void System3D::_RaySample(Ray &ray) {
     const auto normal = closestTriaP->VaryingNormal(closestTriaPos);
     const auto uv = closestTriaP->VaryingUV(closestTriaPos);
 
-    ray.sampleInfo.triaP = closestTriaP;
     ray.sampleInfo.material = closestTriaP->material;
     ray.sampleInfo.uv = uv;
     ray.sampleInfo.inDir = ray.dir;
@@ -692,22 +692,32 @@ void System3D::_SampleTrianglesInOnePixelPathTracingLightSample(
 
                 Ray sampleEmissionRay;
 
-                const auto vec = samplePos - sampleEmissionRay.origin;
+                const auto vec = samplePos - rayCopy.sampleInfo.pos;
                 sampleEmissionRay.dir = vec.normalized();
                 sampleEmissionRay.origin = rayCopy.sampleInfo.pos;
+
+                const float cosTheta =
+                    abs(rayCopy.sampleInfo.normal.dot(sampleEmissionRay.dir));
 
                 _RaySample(sampleEmissionRay);
 
                 if (sampleEmissionRay.IsThisRayPathHit() &&
                     sampleEmissionRay.sampleInfo.triaP == triaP) {
 
-                  const auto cosTheta =
-                      -sampleEmissionRay.sampleInfo.normal.dot(
-                          sampleEmissionRay.dir);
+                  const float cosTheta2 =
+                      abs(sampleEmissionRay.sampleInfo.normal.dot(
+                          sampleEmissionRay.dir));
 
-                  emissionAcc += triaP->material->alpha * cosTheta *
-                                 triaP->Area() * triaP->material->emitionColor /
-                                 vec.squaredNorm();
+                  const Vector3f diffColor =
+                      rayCopy.sampleInfo.material->SampleDiffuseColor(
+                          rayCopy.sampleInfo.normal, rayCopy.sampleInfo.inDir,
+                          rayCopy.sampleInfo.uv);
+
+                  emissionAcc +=
+                      triaP->material->alpha * cosTheta * cosTheta2 *
+                      triaP->Area() *
+                      triaP->material->emitionColor.cwiseProduct(diffColor) /
+                      vec.squaredNorm();
                 }
               }
             }
@@ -757,9 +767,8 @@ void System3D::_SampleTrianglesInOnePixelPathTracingLightSample(
                   diffuseRayInfo.material->SampleDiffuseColor(
                       diffuseRayInfo.normal, diffuseRayInfo.inDir,
                       diffuseRayInfo.uv);
-              diffuseRayInfo.emition = Vector3f::Zero();
 
-              diffuseRayInfo.accColor = emissionAcc;
+              diffuseRayInfo.emition = emissionAcc;
 
               diffuseRayInfo.sampleDeep.bsdfSample += 1;
               infos.PushSamplePointInfo(diffuseRayInfo, rayCopy);
