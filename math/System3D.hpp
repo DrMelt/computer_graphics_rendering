@@ -9,6 +9,7 @@
 #include <Eigen/Geometry>
 #include <OpenImageDenoise/oidn.hpp>
 // clang-format on
+#include "System3DHead.hpp"
 #include "Texture.hpp"
 #include "Transform.hpp"
 #include <iostream>
@@ -520,6 +521,8 @@ public:
 
 protected:
   vector<const Triangle *> trianglesRef;
+  vector<const Triangle *> trianglesEmission;
+
   vector<const Spline *> splinesRef;
   vector<Light *> lightsRef;
   BVHNode *bvhRoot = nullptr;
@@ -543,6 +546,7 @@ public:
   static void ClearRef() {
     system->trianglesRef.clear();
     system->splinesRef.clear();
+    system->trianglesEmission.clear();
   }
 
   static void PushLightRef(Light *light) { system->lightsRef.push_back(light); }
@@ -645,6 +649,12 @@ protected:
 
   vector<const Triangle *> _GetTriasFromBVH(const Ray &ray) const;
 
+  vector<const Triangle *> _GetTriasWithEmission() const;
+
+  void _FlashTrianglesEmission() {
+    trianglesEmission = _GetTriasWithEmission();
+  }
+
   void _DrawBVHsFramwork() const {
     stack<const BVHNode *> nodes;
     nodes.push(bvhRoot);
@@ -710,6 +720,10 @@ protected:
 
   void _DrawTrianglesInRangeMultiThread(const Vector2f &xPercent,
                                         const Vector2f &yPercent) {
+    if constexpr (IS_RAY_TRACING) {
+      _FlashTrianglesEmission();
+    }
+
     vector<thread *> threads;
     int runninghreadCount = 0;
 
@@ -773,6 +787,12 @@ protected:
                                             const uint32_t x, const uint32_t y,
                                             const float nearplane_height_step,
                                             const float nearplane_width_step);
+
+  void _SampleTrianglesInOnePixelPathTracingLightSample(
+      const Matrix4f &toView, const float current_x, const float current_y,
+      const uint32_t x, const uint32_t y, const float nearplane_height_step,
+      const float nearplane_width_step);
+
   void _RaySample(Ray &ray);
 };
 

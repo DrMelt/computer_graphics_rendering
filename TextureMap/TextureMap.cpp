@@ -50,7 +50,7 @@ void Init() {
     system->activeCamera->nearplane_width *= 10;
   }
 
-  System3D::SetPixelSampleTimes(32);
+  System3D::SetPixelSampleTimes(4);
   System3D::SetPixelSampleDeep({3, 20});
   System3D::SetThreads(8);
 
@@ -74,7 +74,7 @@ void Init() {
   Material *lightMaterial = new Material;
   lightMaterial->diffuseColor = Vector3f::Zero();
   lightMaterial->specularColor = Vector3f::Zero();
-  lightMaterial->emitionColor = Vector3f(150, 150, 150);
+  lightMaterial->emitionColor = Vector3f(80, 80, 80);
   meshLight->AssignMaterial(lightMaterial);
 
   model->FlipX();
@@ -121,7 +121,7 @@ void display(void) {
   // light.ShowShadowMapToBuffer(0.1f);
 
   if constexpr (IS_RAY_TRACING) {
-    System3D::DenoiseForBuffer();
+    // System3D::DenoiseForBuffer();
   }
 
   // System3D::DrawNormalToBuffer();

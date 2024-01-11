@@ -17,6 +17,7 @@ struct SamplePointInfo {
                        0.0f}; // the light shot on this point (irradiance)
 
   const Material *material = nullptr;
+  const Triangle *triaP = nullptr;
 
   Vector3f pos = Vector3f::Zero();
   Vector3f normal = Vector3f::Zero();
@@ -39,7 +40,8 @@ public:
       if (ind > 0) {
         auto &info = sampleInfoCopy[ind];
         sampleInfoCopy[info.fromInd].accColor +=
-            info.weight * (info.emition + info.accColor.cwiseProduct(info.color));
+            info.weight *
+            (info.emition + info.accColor.cwiseProduct(info.color));
       } else if (ind > -1) {
         auto &info = sampleInfoCopy[0];
 

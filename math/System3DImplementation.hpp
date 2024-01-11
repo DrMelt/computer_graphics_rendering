@@ -161,6 +161,16 @@ vector<const Triangle *> System3D::_GetTriasFromBVH(const Ray &ray) const {
   return trias;
 }
 
+vector<const Triangle *> System3D::_GetTriasWithEmission() const {
+  vector<const Triangle *> trias;
+  for (const auto triaP : trianglesRef) {
+    if (triaP->material->emitionColor.squaredNorm() > 1e-6f) {
+      trias.push_back(triaP);
+    }
+  }
+  return trias;
+}
+
 void System3D::_DrawTrianglesInOnePixel(const Matrix4f &toView,
                                         const float current_x,
                                         const float current_y, const uint32_t x,
@@ -373,15 +383,16 @@ void System3D::_RaySample(Ray &ray) {
     const auto normal = closestTriaP->VaryingNormal(closestTriaPos);
     const auto uv = closestTriaP->VaryingUV(closestTriaPos);
 
-    ray.sampleInfo.uv = uv;
+    ray.sampleInfo.triaP = closestTriaP;
     ray.sampleInfo.material = closestTriaP->material;
+    ray.sampleInfo.uv = uv;
     ray.sampleInfo.inDir = ray.dir;
     ray.sampleInfo.normal = normal;
     ray.sampleInfo.pos = pos;
   }
 }
 
-// Ray tracing
+// Path tracing
 void System3D::_SampleTrianglesInOnePixelRayTracing(
     const Matrix4f &toView, const float current_x, const float current_y,
     const uint32_t x, const uint32_t y, const float nearplane_height_step,
@@ -585,6 +596,244 @@ void System3D::_SampleTrianglesInOnePixelRayTracing(
       Vector4f(normalColor.x(), normalColor.y(), normalColor.z(), 1.0f);
 }
 
+// Path tracing with light sample
+void System3D::_SampleTrianglesInOnePixelPathTracingLightSample(
+    const Matrix4f &toView, const float current_x, const float current_y,
+    const uint32_t x, const uint32_t y, const float nearplane_height_step,
+    const float nearplane_width_step) {
+
+  Vector3f color = Vector3f::Zero();
+  Vector3f normalColor = Vector3f::Zero();
+  Vector3f albedoColor = Vector3f::Zero();
+  for (uint32_t sampleTime = 0; sampleTime < pixelSampleTimes; sampleTime++) {
+    Ray originRay;
+
+    if constexpr (IS_PERSPECTIVE_PROJECT) {
+      originRay.dir =
+          Vector3f(current_y + nearplane_width_step * random_0_to_1(),
+                   current_x + nearplane_height_step * random_0_to_1(),
+                   activeCamera->nearplane_distance)
+              .normalized();
+    } else {
+      originRay.dir = {0.0f, 0.0f, 1.0f};
+      originRay.origin = {current_y + nearplane_width_step * random_0_to_1(),
+                          current_x + nearplane_height_step * random_0_to_1(),
+                          0.0f};
+    }
+    originRay.Transform(toView);
+
+    // Ray bounce
+    SamplePointInfos infos;
+    infos.sampleInfos.push_back(SamplePointInfo());
+    stack<Ray> rays;
+    rays.push(originRay);
+
+    while (!rays.empty()) {
+      auto ray = rays.top();
+      rays.pop();
+
+      if (ray.sampleInfo.sampleDeep < pixelSampleDeep &&
+          ray.sampleInfo.weight > 1e-6f) {
+        _RaySample(ray);
+        // const Ray ray = ray;
+
+        // ray hit mesh And deep is not infinity
+        if (ray.IsThisRayPathHit()) {
+          // spaw new rays
+
+          // get alpha
+          const auto alpha = ray.sampleInfo.material->SampleAlpha(
+              ray.sampleInfo.normal, ray.sampleInfo.inDir, ray.sampleInfo.uv);
+
+          // alpha
+          if (alpha < 1.0f - 1e-7f) {
+            Ray rayCopy = ray; // new ray
+            SamplePointInfo alphaRayInfo = rayCopy.sampleInfo;
+
+            rayCopy.origin = alphaRayInfo.pos;
+            rayCopy.dir = alphaRayInfo.inDir;
+
+            alphaRayInfo.weight = (1.0f - alpha);
+            alphaRayInfo.color = Vector3f::Ones();
+            alphaRayInfo.emition = Vector3f::Zero();
+
+            alphaRayInfo.sampleDeep.alphaSample += 1;
+            infos.PushSamplePointInfo(alphaRayInfo, rayCopy);
+            if (alphaRayInfo.sampleDeep.alphaSample <
+                pixelSampleDeep.alphaSample) {
+              rays.push(rayCopy);
+            }
+          }
+
+          if (alpha > 0.0f) {
+            // emission
+            //{
+            //  Ray rayCopy = ray;
+            //  SamplePointInfo emissionRayInfo = rayCopy.sampleInfo;
+
+            //  emissionRayInfo.emition =
+            //      emissionRayInfo.material->SampleEmitionColor(
+            //          emissionRayInfo.normal, emissionRayInfo.inDir,
+            //          emissionRayInfo.uv);
+            //  emissionRayInfo.color = Vector3f::Zero();
+
+            //  emissionRayInfo.weight = alpha;
+
+            //  infos.PushSamplePointInfo(emissionRayInfo, rayCopy);
+            //}
+
+            // light sample
+            Vector3f emissionAcc = Vector3f::Zero();
+            {
+              Ray rayCopy = ray;
+
+              for (const auto triaP : trianglesEmission) {
+                const auto samplePos = triaP->ScatterPoint();
+
+                Ray sampleEmissionRay;
+
+                const auto vec = samplePos - sampleEmissionRay.origin;
+                sampleEmissionRay.dir = vec.normalized();
+                sampleEmissionRay.origin = rayCopy.sampleInfo.pos;
+
+                _RaySample(sampleEmissionRay);
+
+                if (sampleEmissionRay.IsThisRayPathHit() &&
+                    sampleEmissionRay.sampleInfo.triaP == triaP) {
+
+                  const auto cosTheta =
+                      -sampleEmissionRay.sampleInfo.normal.dot(
+                          sampleEmissionRay.dir);
+
+                  emissionAcc += triaP->material->alpha * cosTheta *
+                                 triaP->Area() * triaP->material->emitionColor /
+                                 vec.squaredNorm();
+                }
+              }
+            }
+
+            // reflection
+            {
+              Ray rayCopy = ray;
+              SamplePointInfo reflectionRayInfo = rayCopy.sampleInfo;
+
+              // sample new ray dir
+              float newWeight = 0.0f;
+              auto newDir = reflectionRayInfo.material->SampleReflectionOutDir(
+                  reflectionRayInfo.normal, reflectionRayInfo.inDir, newWeight);
+              reflectionRayInfo.weight = newWeight * alpha;
+
+              rayCopy.origin = reflectionRayInfo.pos;
+              rayCopy.dir = newDir;
+
+              reflectionRayInfo.color =
+                  reflectionRayInfo.material->SampleSpecularColor(
+                      reflectionRayInfo.normal, reflectionRayInfo.inDir,
+                      reflectionRayInfo.uv);
+
+              reflectionRayInfo.sampleDeep.bsdfSample += 1;
+              infos.PushSamplePointInfo(reflectionRayInfo, rayCopy);
+              if (reflectionRayInfo.sampleDeep.bsdfSample <
+                  pixelSampleDeep.bsdfSample) {
+                rays.push(rayCopy);
+              }
+            }
+
+            // diffuse
+            if (ray.sampleInfo.material->transparency < 1.0f) {
+              Ray rayCopy = ray;
+              SamplePointInfo diffuseRayInfo = rayCopy.sampleInfo;
+
+              // sample new ray dir
+              auto newWeight = 0.0f;
+              auto newDir = diffuseRayInfo.material->SampleDiffuseOutDir(
+                  diffuseRayInfo.normal, diffuseRayInfo.inDir, newWeight);
+              diffuseRayInfo.weight = newWeight * alpha;
+
+              rayCopy.origin = diffuseRayInfo.pos;
+              rayCopy.dir = newDir;
+
+              diffuseRayInfo.color =
+                  diffuseRayInfo.material->SampleDiffuseColor(
+                      diffuseRayInfo.normal, diffuseRayInfo.inDir,
+                      diffuseRayInfo.uv);
+              diffuseRayInfo.emition = Vector3f::Zero();
+
+              diffuseRayInfo.accColor = emissionAcc;
+
+              diffuseRayInfo.sampleDeep.bsdfSample += 1;
+              infos.PushSamplePointInfo(diffuseRayInfo, rayCopy);
+              if (diffuseRayInfo.sampleDeep.bsdfSample <
+                  pixelSampleDeep.bsdfSample) {
+                rays.push(rayCopy);
+              }
+            }
+
+            // transmision
+            if (ray.sampleInfo.material->transparency > 0.0f) {
+              Ray rayCopy = ray;
+              auto transmisionRayInfo = rayCopy.sampleInfo;
+
+              auto newWeight = 0.0f;
+              auto newDir =
+                  transmisionRayInfo.material->SampleTransmissionOutDir(
+                      transmisionRayInfo.normal, transmisionRayInfo.inDir,
+                      newWeight);
+              transmisionRayInfo.weight = newWeight * alpha;
+
+              rayCopy.origin = transmisionRayInfo.pos;
+              rayCopy.dir = newDir;
+
+              transmisionRayInfo.color =
+                  transmisionRayInfo.material->SampleTransmissionColor(
+                      transmisionRayInfo.normal, transmisionRayInfo.inDir,
+                      transmisionRayInfo.uv);
+              transmisionRayInfo.emition = Vector3f::Zero();
+
+              transmisionRayInfo.sampleDeep.bsdfSample += 1;
+              infos.PushSamplePointInfo(transmisionRayInfo, rayCopy);
+              if (transmisionRayInfo.sampleDeep.bsdfSample <
+                  pixelSampleDeep.bsdfSample) {
+                rays.push(rayCopy);
+              }
+            }
+          }
+        }
+
+        // hit sky
+        else {
+          Ray rayCopy = ray;
+          auto skyRayInfo = rayCopy.sampleInfo;
+          skyRayInfo.material = &skyBox;
+          skyRayInfo.emition = skyBox.SampleSkyBoxColor(rayCopy.dir);
+          skyRayInfo.color = skyRayInfo.emition;
+
+          skyRayInfo.weight = 1.0f;
+
+          infos.PushSamplePointInfo(skyRayInfo, rayCopy);
+        }
+      }
+    }
+
+    // Ray color
+    color += infos.AccColor();
+    normalColor += infos.HitNormal();
+    albedoColor += infos.HitAlbedo();
+  }
+  color /= static_cast<float>(pixelSampleTimes);
+  normalColor /= static_cast<float>(pixelSampleTimes);
+  albedoColor /= static_cast<float>(pixelSampleTimes);
+
+  // Set pixel color
+  System3D::SetBufferColor(x, y,
+                           Vector4f(color.x(), color.y(), color.z(), 1.0f));
+
+  system->albedoBuffer[IndFromXY(x, y)] =
+      Vector4f(albedoColor.x(), albedoColor.y(), albedoColor.z(), 1.0f);
+  system->normalBuffer[IndFromXY(x, y)] =
+      Vector4f(normalColor.x(), normalColor.y(), normalColor.z(), 1.0f);
+}
+
 void System3D::_DrawSplines() {
   for (auto splineP : splinesRef) {
     splineP->DrawToBuffer();
@@ -594,6 +843,7 @@ void System3D::_DrawSplines() {
 void System3D::_DrawTrianglesInRangePixel(const Vector2i &xRange,
                                           const Vector2i &yRange,
                                           int *const runninghreadCount) {
+
   auto toView = System3D::ToView();
   const float window_x_i = 1.0f / window_x, window_y_i = 1.0f / window_y;
 
@@ -611,9 +861,13 @@ void System3D::_DrawTrianglesInRangePixel(const Vector2i &xRange,
 
       // Sample
       if constexpr (IS_RAY_TRACING) {
-        _SampleTrianglesInOnePixelRayTracing(toView, current_x, current_y, x, y,
-                                             nearplane_height_step,
-                                             nearplane_width_step);
+        //_SampleTrianglesInOnePixelRayTracing(toView, current_x, current_y, x,
+        // y,
+        //                                     nearplane_height_step,
+        //                                     nearplane_width_step);
+        _SampleTrianglesInOnePixelPathTracingLightSample(
+            toView, current_x, current_y, x, y, nearplane_height_step,
+            nearplane_width_step);
       } else {
         _SampleTrianglesInOnePixelWithMaterial(toView, current_x, current_y, x,
                                                y);
