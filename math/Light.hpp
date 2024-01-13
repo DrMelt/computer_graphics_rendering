@@ -121,8 +121,12 @@ protected:
     ray.dir = dir;
     auto trias = System3D::GetSystem()->GetTriasFromBVH(ray);
     for (auto triaP : trias) {
-      auto triaPos = triaP->RayIntersect(ray);
-      if (ray.deep < shadowMap->Sample(imagePos.x(), imagePos.y())) {
+      const auto triaPos = triaP->RayIntersect(ray);
+      const auto alpha =
+          triaP->material->SampleAlpha(triaP->VaryingUV(triaPos));
+
+      if (alpha > 1.0f - 1e-6f &&
+          ray.deep < shadowMap->Sample(imagePos.x(), imagePos.y())) {
         shadowMap->SetData(x, y, ray.deep);
       }
     }

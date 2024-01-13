@@ -1,8 +1,22 @@
 #pragma once
 
+enum RayType {
+  CAMERA,
+  DIFFUSE,
+  SPECULAR,
+  REFLECTION,
+  REFRACTION,
+  EMISSION,
+  SKYBOX,
+  ALPHA
+};
+
 struct SamplePointInfo {
+
   SamplePointInfo() = default;
   SamplePointInfo(const SamplePointInfo &other) = default;
+
+  RayType rayType = RayType::CAMERA;
 
   System3D::SampleDeep sampleDeep = {0, 0}; // times of ray bounced
 
@@ -60,13 +74,14 @@ public:
     return (sampleInfos)[sampleInfos.size() - 1].sampleDeep;
   }
 
-  void PushSamplePointInfo(SamplePointInfo &info, Ray &ray);
+  void PushSamplePointInfo(SamplePointInfo &info, Ray &ray,
+                           const RayType rayType);
 
   const SamplePointInfo &LastInfo() const {
     return (sampleInfos)[sampleInfos.size() - 1];
   }
 
-  Vector3f HitNormal(const uint32_t hit = 0) const {
+  Vector3f HitNormal(const uint32_t hit) const {
     if (sampleInfos.size() > hit) {
       return (sampleInfos)[hit].normal;
     } else {
@@ -74,12 +89,42 @@ public:
     }
   }
 
-  Vector3f HitAlbedo(const uint32_t hit = 0) const {
+  Vector3f HitNormal(const RayType rayType = RayType::DIFFUSE) const {
+    Vector3f result = Vector3f::Zero();
+
+    uint32_t ind = 0;
+    while (ind < sampleInfos.size()) {
+      if (sampleInfos[ind].rayType == rayType) {
+        result = sampleInfos[ind].normal;
+        break;
+      }
+      ind++;
+    }
+
+    return result;
+  }
+
+  Vector3f HitAlbedo(const uint32_t hit) const {
     if (sampleInfos.size() > hit) {
       return (sampleInfos)[hit].color;
     } else {
       return Vector3f::Zero();
     }
+  }
+
+  Vector3f HitAlbedo(const RayType rayType = RayType::DIFFUSE) const {
+    Vector3f result = Vector3f::Zero();
+
+    uint32_t ind = 0;
+    while (ind < sampleInfos.size()) {
+      if (sampleInfos[ind].rayType == rayType) {
+        result = sampleInfos[ind].color;
+        break;
+      }
+      ind++;
+    }
+
+    return result;
   }
 };
 
@@ -106,8 +151,10 @@ public:
   }
 };
 
-void SamplePointInfos::PushSamplePointInfo(SamplePointInfo &info, Ray &ray) {
+void SamplePointInfos::PushSamplePointInfo(SamplePointInfo &info, Ray &ray,
+                                           const RayType rayType) {
 
+  info.rayType = rayType;
   info.ind = sampleInfos.size();
   info.fromInd = ray.sampleInfo.ind;
   ray.sampleInfo = info;

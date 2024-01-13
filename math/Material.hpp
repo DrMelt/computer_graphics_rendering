@@ -13,7 +13,6 @@
 #include <string>
 #include <vector>
 // clang-format on
-#include "Texture.hpp"
 
 using namespace std;
 using namespace Eigen;
@@ -33,13 +32,13 @@ public:
 
   Vector3f diffuseColor = {0.8f, 0.8f, 0.8f};
   Vector3f specularColor = {0.8f, 0.8f, 0.8f};
-  Vector3f emitionColor = Vector3f::Zero();
+  Vector3f emissionColor = Vector3f::Zero();
   Vector3f transmissionColor = {1.0f, 1.0f, 1.0f};
   float alpha = 1.0f;
 
   Texture<Vector3f> *diffuseTexture = nullptr;
   Texture<Vector3f> *specularTexture = nullptr;
-  Texture<Vector3f> *emitionTexture = nullptr;
+  Texture<Vector3f> *emissionTexture = nullptr;
   Texture<Vector3f> *transmissionTexture = nullptr;
   Texture<float> *alphaTexture = nullptr;
 
@@ -59,9 +58,9 @@ public:
       delete specularTexture;
       specularTexture = nullptr;
     }
-    if (emitionTexture != nullptr) {
-      delete emitionTexture;
-      emitionTexture = nullptr;
+    if (emissionTexture != nullptr) {
+      delete emissionTexture;
+      emissionTexture = nullptr;
     }
     if (transmissionTexture != nullptr) {
       delete transmissionTexture;
@@ -82,10 +81,10 @@ public:
     } else {
       specularTexture = nullptr;
     }
-    if (mt.emitionTexture != nullptr) {
-      emitionTexture = new Texture<Vector3f>(*mt.emitionTexture);
+    if (mt.emissionTexture != nullptr) {
+      emissionTexture = new Texture<Vector3f>(*mt.emissionTexture);
     } else {
-      emitionTexture = nullptr;
+      emissionTexture = nullptr;
     }
     if (mt.transmissionTexture != nullptr) {
       transmissionTexture = new Texture<Vector3f>(*mt.transmissionTexture);
@@ -96,12 +95,12 @@ public:
 
 public:
   virtual Vector3f
-  SampleEmitionColor(const Vector3f normal, const Vector3f inDir,
-                     const Vector2f uv = Vector2f::Zero()) const {
-    if (emitionTexture != nullptr) {
-      return emitionTexture->Sample(uv.x(), uv.y());
+  SampleEmissionColor(const Vector3f normal, const Vector3f inDir,
+                      const Vector2f uv = Vector2f::Zero()) const {
+    if (emissionTexture != nullptr) {
+      return emissionTexture->Sample(uv.x(), uv.y());
     } else {
-      return emitionColor;
+      return emissionColor;
     }
   }
 
@@ -144,21 +143,31 @@ public:
     }
   }
 
+  virtual float SampleAlpha(const Vector2f uv) const {
+    if (alphaTexture != nullptr) {
+      return alphaTexture->Sample(uv.x(), uv.y());
+    } else {
+      return alpha;
+    }
+  }
   // Will change 'weight'
   virtual Vector3f SampleDiffuseOutDir(const Vector3f &normal,
                                        const Vector3f &inDir,
                                        float &weight) const {
-    const float x_1 = random_0_to_1(), x_2 = random_0_to_1();
+    const float x_1 = random_0_to_1();
+    const float x_2 = random_0_to_1();
     const float theta = M_PI_2 - acosf(x_1);
-    const auto rateZ = sinf(theta);
-    //weight = rateZ * (1.0f - transparency) * static_cast<float>(M_PI * 2);
-    weight = rateZ * (1.0f - transparency) ;
+    const float rateZ = sinf(theta);
+    // weight = rateZ * (1.0f - transparency) * static_cast<float>(M_PI * 2);
+    weight = rateZ * (1.0f - transparency);
 
-    const float r = std::sqrt(1.0f - rateZ * rateZ), phi = 2 * M_PI * x_2;
-    const Vector3f localRay(r * std::cos(phi), r * std::sin(phi), rateZ);
-    auto toLookAt = ToLookAt(normal, inDir);
+    const float r = sqrtf(1.0f - rateZ * rateZ), phi = 2 * M_PI * x_2;
+    const Vector3f localRay(r * cosf(phi), r * sinf(phi), rateZ);
 
-    const auto newDir = (toLookAt * localRay).normalized();
+    const float sideSign = normal.dot(inDir) < 0.0f ? 1.0f : -1.0f;
+    const Matrix3f toLookAt = ToLookAt(normal * sideSign, inDir);
+
+    const Vector3f newDir = (toLookAt * localRay).normalized();
 
     return newDir;
   }
@@ -166,7 +175,7 @@ public:
   virtual Vector3f SampleTransmissionOutDir(const Vector3f &normal,
                                             const Vector3f &inDir,
                                             float &weight) const {
-    weight *= transparency;
+    weight = transparency;
 
     const auto inDirProject = normal.dot(inDir);
     const auto dirVertical = inDir - normal * inDirProject;
@@ -175,12 +184,12 @@ public:
     // to air
     if (inDirProject > 0.0f) {
       sinOut = sinIn * IOR;
-      weight = Fresnel(0.1f, inDirProject, IOR);
+      weight *= Fresnel(0.1f, inDirProject, IOR);
     }
     // to inner
     else {
       sinOut = sinIn / IOR;
-      weight = -Fresnel(0.1f, -inDirProject, 1.0f);
+      weight *= Fresnel(0.1f, -inDirProject, 1.0f);
     }
 
     Vector3f newDir;
@@ -242,7 +251,7 @@ public:
 
       return color;
     } else {
-      return emitionColor;
+      return emissionColor;
     }
   }
 };

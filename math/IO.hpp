@@ -11,8 +11,6 @@
 #include <stack>
 #include <string>
 #include <vector>
-
-#include "DataStruct.hpp"
 // clang-format on
 
 using namespace std;
@@ -160,8 +158,31 @@ void ReadMTLFile(const string &fileName, const string &objFilePath) {
     else if (prefix == string("Ke")) {
       if (material != nullptr) {
         auto words = SlpitString(line);
-        material->emitionColor = {stof(words[0]), stof(words[1]),
+        material->emissionColor = {stof(words[0]), stof(words[1]),
                                   stof(words[2])};
+      }
+    }
+    // alpha
+    else if (prefix == string("d")) {
+      if (material != nullptr) {
+        auto words = SlpitString(line);
+        material->alpha = stof(words[0]);
+      }
+    }
+    // transmission
+    else if (prefix == string("Tf")) {
+      if (material != nullptr) {
+        auto words = SlpitString(line);
+        //material->transmissionColor = {stof(words[0]), stof(words[1]),
+        //                               stof(words[2])};
+        material->transparency = stof(words[0]);
+      }
+    }
+    // IOR
+    else if (prefix == string("Ni")) {
+      if (material != nullptr) {
+        auto words = SlpitString(line);
+        material->IOR = stof(words[0]);
       }
     }
     // diffuse texture
@@ -190,8 +211,8 @@ void ReadMTLFile(const string &fileName, const string &objFilePath) {
           imgPath = folderPath + "/" + line;
         }
 
-        material->emitionTexture = new Texture<Vector3f>(0, 0);
-        material->emitionTexture->ReadImageAndMatchSize(imgPath);
+        material->emissionTexture = new Texture<Vector3f>(0, 0);
+        material->emissionTexture->ReadImageAndMatchSize(imgPath);
       }
     }
     // alpha texture
@@ -222,20 +243,6 @@ void ReadMTLFile(const string &fileName, const string &objFilePath) {
  */
 Geometry *ReadOBJ(const string &filePath) {
   auto lines = ReadFileWithLines(filePath);
-  /*  vector<string> processedLines;
-    // Uncomment and delete empty lines
-    for (auto &line : lines) {
-      if (line.size() > 0) {
-        for (auto ch : line) {
-          if (ch != ' ') {
-            if (ch != '#') {
-              processedLines.push_back(line);
-            }
-            break;
-          }
-        }
-      }
-    }*/
 
   auto geo = new Geometry;
   vector<Vector3f> normals;

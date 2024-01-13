@@ -91,9 +91,9 @@ uint64_t CVImageIndStart(const uint32_t x, const uint32_t y, const int height,
                          const int width, const float xScale,
                          const float yScale, const int channels) {
   return ((height - static_cast<uint64_t>(1) -
-           static_cast<uint32_t>(xScale * x)) *
+           static_cast<uint64_t>(xScale * x)) *
               width +
-          static_cast<uint32_t>(yScale * y)) *
+          static_cast<uint64_t>(yScale * y)) *
          channels;
 }
 

@@ -32,7 +32,7 @@ Vector3f eyeUp = {0, 1, 0};
 // Vector3f eyePos = {0, 20.0f, 0};
 // Vector3f eyeUp = {0, 0, -1};
 
-Geometry *model = nullptr, *meshLight = nullptr;
+Geometry *model = nullptr, *meshLight = nullptr, *extraTranslucence = nullptr;
 Light light1, light2, light3;
 
 void Init() {
@@ -52,14 +52,18 @@ void Init() {
 
   System3D::SetPixelSampleTimes(8);
   System3D::SetPixelSampleDeep({3, 20});
-  System3D::SetThreads(8);
+  System3D::SetThreads(94);
+
+  System3D::ClearRef();
 
   if constexpr (!IS_RAY_TRACING) {
     light1.axis.origin = Vector3f(0, 16, -20);
-    light1.intensity = Vector3f(70, 70, 70);
+    light1.intensity = Vector3f(400, 400, 400);
     light1.shadowMapHeight = 2048;
+
     light2.axis.origin = Vector3f(1.5f, 2, -2.5f);
     light2.intensity = Vector3f(3, 3, 3);
+
     light3.axis.origin = Vector3f(-1.5f, 2, -2.5f);
     light3.intensity = Vector3f(3, 3, 3);
     System3D::PushLightRef(&light1);
@@ -70,33 +74,33 @@ void Init() {
   // Read models
   const string folderPath = "../../../../../models/";
   // const string folderPath = "../../models/";
+
   model = ReadOBJ(folderPath + "bighw/stage.obj");
-  meshLight = ReadOBJ(folderPath + "bighw/light.obj");
-
-  Material *lightMaterial = new Material;
-  lightMaterial->diffuseColor = Vector3f::Zero();
-  lightMaterial->specularColor = Vector3f::Zero();
-  lightMaterial->emitionColor = Vector3f(200, 200, 200);
-  meshLight->AssignMaterial(lightMaterial);
-
-  model->FlipX();
-  meshLight->FlipX();
-
-  System3D::ClearRef();
   model->PushPrimsToSystem();
 
-  // For ray Tracing
+  // For Path Tracing
   if constexpr (IS_RAY_TRACING) {
+    meshLight = ReadOBJ(folderPath + "bighw/light.obj");
+
+    Material *lightMaterial = new Material;
+    lightMaterial->diffuseColor = Vector3f::Zero();
+    lightMaterial->specularColor = Vector3f::Zero();
+    lightMaterial->emissionColor = Vector3f(50, 50, 50);
+    meshLight->AssignMaterial(lightMaterial);
+
     meshLight->PushPrimsToSystem();
+
+    extraTranslucence = ReadOBJ(folderPath + "bighw/extraTranslucence.obj");
+    extraTranslucence->PushPrimsToSystem();
   }
 
   System3D::BuildBVH();
 
   // Read hdr and set
   Texture<Vector3f> hdr(0, 0);
-  hdr.ReadImageAndMatchSize(folderPath + "/bighw/textures/sky.png");
+  hdr.ReadImageAndMatchSize(folderPath + "bighw/textures/sky.png");
   system->skyBox.texture = new Texture(hdr);
-  system->skyBox.emitionColor = Vector3f(0.3f, 0.3f, 0.3f);
+  system->skyBox.emissionColor = Vector3f(0.3f, 0.3f, 0.3f);
 
   if constexpr (!IS_RAY_TRACING) {
     System3D::RefreshShadowMap();
@@ -110,26 +114,12 @@ void display(void) {
 
   System3D::ClearBuffer();
 
-  if constexpr (IS_RAY_TRACING) {
-    // System3D::DrawAtReducedSize(Vector2f(0.0f, 1.0f), Vector2f(0.0f, 1.0f),
-    //                             System3D::GetSystem()->pixelSampleTimes * 4,
-    //                             0.5f);
-    System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
-                                              Vector2f(0.0f, 1.0f));
-  } else {
-    System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
-                                              Vector2f(0.0f, 1.0f));
-  }
-  // light.ShowShadowMapToBuffer(0.1f);
+  System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
+                                            Vector2f(0.0f, 1.0f));
 
-  if constexpr (IS_RAY_TRACING) {
+  if constexpr (IS_RAY_TRACING && OPEN_DENOISE) {
     System3D::DenoiseForBuffer();
   }
-
-  // System3D::DrawNormalToBuffer();
-  //  System3D::DrawAlbedoToBuffer();
-
-  // System3D::ShowTextureToBuffer(*System3D::GetSystem()->skyBox.texture);
 
   System3D::ShowBuffer();
 
@@ -144,7 +134,7 @@ void keyboard(unsigned char key, int x, int y) {
 
   case 'a':
   case 'A': {
-    Vector3f stepVec = {-cameraStep, 0, 0};
+    Vector3f stepVec = {cameraStep, 0, 0};
     auto viewM = System3D::GetV().inverse();
     stepVec = TransformForVector(stepVec, viewM);
 
@@ -155,7 +145,7 @@ void keyboard(unsigned char key, int x, int y) {
   }
   case 'd':
   case 'D': {
-    Vector3f stepVec = {cameraStep, 0, 0};
+    Vector3f stepVec = {-cameraStep, 0, 0};
     auto viewM = System3D::GetV().inverse();
     stepVec = TransformForVector(stepVec, viewM);
 
@@ -213,7 +203,7 @@ void keyboard(unsigned char key, int x, int y) {
   case 'q':
   case 'Q': {
     auto rotateM = Rotate3dH(System3D::GetSystem()->activeCamera->eyeUp,
-                             cameraRotationStep);
+                             -cameraRotationStep);
 
     Vector3f dir = System3D::GetSystem()->activeCamera->lookAtPos -
                    System3D::GetSystem()->activeCamera->eyePos;
@@ -228,7 +218,7 @@ void keyboard(unsigned char key, int x, int y) {
   case 'e':
   case 'E': {
     auto rotateM = Rotate3dH(System3D::GetSystem()->activeCamera->eyeUp,
-                             -cameraRotationStep);
+                             cameraRotationStep);
     Vector3f dir = System3D::GetSystem()->activeCamera->lookAtPos -
                    System3D::GetSystem()->activeCamera->eyePos;
     dir = TransformForVector(dir, rotateM);

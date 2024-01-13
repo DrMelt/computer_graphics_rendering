@@ -17,14 +17,20 @@
 #include <filesystem>
 
 
-constexpr bool IS_RAY_TRACING = false;
+constexpr bool IS_RAY_TRACING = true;
+constexpr bool OPEN_DENOISE = true;
 constexpr bool IS_PERSPECTIVE_PROJECT = true;
 
 #include "Transform.hpp"
 #include "Texture.hpp"
 #include "Material.hpp"
 #include "System3D.hpp"
+
 #include "DataStruct.hpp"
+#include "Ray.hpp"
+#include "Primitive.hpp"
+#include "Geometry.hpp"
+
 #include "Light.hpp"
 #include "System3DImplementation.hpp"
 #include "IO.hpp"

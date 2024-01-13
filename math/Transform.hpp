@@ -74,63 +74,40 @@ Matrix4f Translate3dH(const Vector3f &translation) {
   return translate_matrix;
 }
 
-#include <iostream>
+// [0,0,1] -> lookAtDir
+Matrix3f ToLookAt(const Vector3f &lookAt, const Vector3f &upVec) {
+  const Vector3f lookAtDir = lookAt.normalized();
+  const Vector3f normal = -(lookAtDir.cross(upVec)).normalized();
+  const Vector3f up = lookAtDir.cross(normal);
+
+  Matrix3f rotate;
+  rotate.block<3, 1>(0, 0) = normal;
+  rotate.block<3, 1>(0, 1) = up;
+  rotate.block<3, 1>(0, 2) = lookAtDir;
+
+  return rotate;
+}
+// [0,0,1] -> lookAtDir and translate
+Matrix4f ToLookAtMatrix(const Vector3f &eyePos, const Vector3f &lookAtCenterPos,
+                        const Vector3f &upVec) {
+
+  Matrix4f transfer = Matrix4f::Identity();
+  transfer.block<3, 1>(0, 3) = eyePos;
+
+  Matrix4f rotate = Matrix4f::Zero();
+  rotate.block<3, 3>(0, 0) = ToLookAt(lookAtCenterPos - eyePos, upVec);
+  rotate(3, 3) = 1.0f;
+
+  const Matrix4f toLookAtMatrix = transfer * rotate;
+
+  return toLookAtMatrix;
+}
 
 // View transfer  ( same as Camera look dir -> [0,0,1] )
 // Translate and rotate
 Matrix4f LookAtMatrix(const Vector3f &eyePos, const Vector3f &lookAtCenterPos,
                       const Vector3f &upVec) {
-  Vector3f pos = eyePos, lookAt = lookAtCenterPos, up = upVec;
-
-  lookAt = (lookAt - pos).normalized();
-  Vector3f normal = lookAt.cross(up).normalized();
-  up = normal.cross(lookAt);
-  Matrix4f transfer = Matrix4f::Identity();
-  transfer.block<3, 1>(0, 3) = -pos;
-
-  Matrix4f rotate = Matrix4f::Zero();
-  rotate.block<3, 1>(0, 0) = -normal;
-  rotate.block<3, 1>(0, 1) = up;
-  rotate.block<3, 1>(0, 2) = lookAt;
-  rotate(3, 3) = 1.0f;
-
-  Matrix4f lookAtMatrix = rotate.inverse() * transfer;
-
-  return lookAtMatrix;
-}
-
-// [0,0,1] -> lookAtDir
-Matrix3f ToLookAt(const Vector3f &lookAt, const Vector3f &upVec) {
-  Vector3f normal = -lookAt.cross(upVec).normalized();
-  Vector3f up = lookAt.cross(normal);
-
-  Matrix3f rotate;
-  rotate.block<3, 1>(0, 0) = normal;
-  rotate.block<3, 1>(0, 1) = up;
-  rotate.block<3, 1>(0, 2) = lookAt;
-
-  return rotate;
-}
-
-Matrix4f ToLookAtMatrix(const Vector3f &eyePos, const Vector3f &lookAtCenterPos,
-                        const Vector3f &upVec) {
-  Vector3f pos = eyePos, lookAt = lookAtCenterPos, up = upVec;
-
-  lookAt = (lookAt - pos).normalized();
-  Vector3f normal = lookAt.cross(up).normalized();
-  up = normal.cross(lookAt);
-  Matrix4f transfer = Matrix4f::Identity();
-  transfer.block<3, 1>(0, 3) = pos;
-
-  Matrix4f rotate = Matrix4f::Zero();
-  rotate.block<3, 1>(0, 0) = -normal;
-  rotate.block<3, 1>(0, 1) = up;
-  rotate.block<3, 1>(0, 2) = lookAt;
-  rotate(3, 3) = 1.0f;
-
-  Matrix4f toLookAtMatrix = transfer * rotate;
-
-  return toLookAtMatrix;
+  return ToLookAtMatrix(eyePos, lookAtCenterPos, upVec).inverse();
 }
 
 // Project transfer

@@ -9,8 +9,6 @@
 #include <Eigen/Geometry>
 #include <OpenImageDenoise/oidn.hpp>
 // clang-format on
-#include "Texture.hpp"
-#include "Transform.hpp"
 #include <iostream>
 #include <math.h>
 #include <random>
@@ -139,7 +137,7 @@ public:
 
   // rotate z axis to view lookAt
   static Matrix4f ToView() {
-    auto activeCamera = system->activeCamera;
+    const auto activeCamera = system->activeCamera;
     return ToLookAtMatrix(activeCamera->eyePos, activeCamera->lookAtPos,
                           activeCamera->eyeUp);
   }
@@ -476,7 +474,7 @@ protected:
   Vector4f *albedoBuffer = nullptr;
 
 public:
-  // Ray tracing
+  // Path tracing
   uint32_t pixelSampleTimes = 4;
   struct SampleDeep {
   public:
@@ -575,6 +573,7 @@ public:
   static void DrawTrianglesInClip(const Primitive2D &clip) {
     system->_DrawTrianglesInClip(clip);
   }
+
   static void DrawTrianglesInRange(const Vector2f xPercent,
                                    const Vector2f yPercent) {
     int temp = 0;
