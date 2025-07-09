@@ -50,9 +50,9 @@ void Init() {
     system->activeCamera->nearplane_width *= 10;
   }
 
-  System3D::SetPixelSampleTimes(8);
+  System3D::SetPixelSampleTimes(4);
   System3D::SetPixelSampleDeep({3, 20});
-  System3D::SetThreads(94);
+  System3D::SetThreads(8);
 
   System3D::ClearRef();
 
@@ -66,6 +66,7 @@ void Init() {
 
     light3.axis.origin = Vector3f(-1.5f, 2, -2.5f);
     light3.intensity = Vector3f(3, 3, 3);
+
     System3D::PushLightRef(&light1);
     System3D::PushLightRef(&light2);
     System3D::PushLightRef(&light3);
@@ -105,6 +106,15 @@ void Init() {
   if constexpr (!IS_RAY_TRACING) {
     System3D::RefreshShadowMap();
   }
+
+  if constexpr (IS_RAY_TRACING) {
+    System3D::ClearBuffer();
+    System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
+                                              Vector2f(0.0f, 1.0f));
+    if constexpr (OPEN_DENOISE) {
+      System3D::DenoiseForBuffer();
+    }
+  }
 }
 
 // »æÖÆÄÚÈÝ
@@ -112,13 +122,10 @@ void display(void) {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  System3D::ClearBuffer();
-
-  System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
-                                            Vector2f(0.0f, 1.0f));
-
-  if constexpr (IS_RAY_TRACING && OPEN_DENOISE) {
-    System3D::DenoiseForBuffer();
+  if constexpr (!IS_RAY_TRACING) {
+    System3D::ClearBuffer();
+    System3D::DrawTrianglesInRangeMultiThread(Vector2f(0.0f, 1.0f),
+                                              Vector2f(0.0f, 1.0f));
   }
 
   System3D::ShowBuffer();

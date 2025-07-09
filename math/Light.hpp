@@ -1,11 +1,6 @@
 #ifndef _LIGHT_HPP_
 #define _LIGHT_HPP_
 
-// clang-format off
-#include "Texture.hpp"
-#include "DataStruct.hpp"
-// clang-format on
-
 struct Light {
 public:
   Vector3f intensity = {5.0f, 5.0f, 5.0f};

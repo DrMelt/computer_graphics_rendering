@@ -1,18 +1,6 @@
 #ifndef _IO_HPP_
 #define _IO_HPP_
 
-// clang-format off
-#include <Eigen/Geometry>
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
-#include <fstream>
-#include <iostream>
-#include <stack>
-#include <string>
-#include <vector>
-// clang-format on
-
 using namespace std;
 using namespace Eigen;
 
@@ -159,7 +147,7 @@ void ReadMTLFile(const string &fileName, const string &objFilePath) {
       if (material != nullptr) {
         auto words = SlpitString(line);
         material->emissionColor = {stof(words[0]), stof(words[1]),
-                                  stof(words[2])};
+                                   stof(words[2])};
       }
     }
     // alpha
@@ -173,8 +161,8 @@ void ReadMTLFile(const string &fileName, const string &objFilePath) {
     else if (prefix == string("Tf")) {
       if (material != nullptr) {
         auto words = SlpitString(line);
-        //material->transmissionColor = {stof(words[0]), stof(words[1]),
-        //                               stof(words[2])};
+        // material->transmissionColor = {stof(words[0]), stof(words[1]),
+        //                                stof(words[2])};
         material->transparency = stof(words[0]);
       }
     }

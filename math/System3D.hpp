@@ -9,11 +9,6 @@
 #include <Eigen/Geometry>
 #include <OpenImageDenoise/oidn.hpp>
 // clang-format on
-#include <iostream>
-#include <math.h>
-#include <random>
-#include <string.h>
-#include <thread>
 
 using namespace std;
 using namespace Eigen;
@@ -76,8 +71,10 @@ public:
     this->containedTriaRef = containedTriaRef;
   }
   const Triangle *ContainedTriaRef() const { return containedTriaRef; }
+
   void SetNextNode1(const BVHNode *node) { nextNode1 = node; }
   const BVHNode *NextNode1() const { return nextNode1; }
+
   void SetNextNode2(const BVHNode *node) { nextNode2 = node; }
   const BVHNode *NextNode2() const { return nextNode2; }
 

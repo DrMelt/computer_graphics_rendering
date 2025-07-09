@@ -15,9 +15,10 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <Eigen/Geometry>
+#include <thread>
 
-
-constexpr bool IS_RAY_TRACING = true;
+constexpr bool IS_RAY_TRACING = false;
 constexpr bool OPEN_DENOISE = true;
 constexpr bool IS_PERSPECTIVE_PROJECT = true;
 
@@ -34,6 +35,9 @@ constexpr bool IS_PERSPECTIVE_PROJECT = true;
 #include "Light.hpp"
 #include "System3DImplementation.hpp"
 #include "IO.hpp"
+
+#include "Hash.hpp"
+
 // clang-format on
 
 #endif // !_SYSTEM3D_HEAD_HPP_

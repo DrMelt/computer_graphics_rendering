@@ -1,11 +1,6 @@
 #ifndef _TRANSFORM_HPP_
 #define _TRANSFORM_HPP_
 
-#define _USE_MATH_DEFINES
-#include <Eigen/Geometry>
-#include <cmath>
-#include <random>
-
 using namespace Eigen;
 
 std::random_device random_device_instance;
